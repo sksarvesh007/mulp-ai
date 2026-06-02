@@ -42,7 +42,7 @@ export default function RootLayout({
         </header>
         <main className="mx-auto max-w-6xl px-6 py-10">{children}</main>
         <footer className="mx-auto max-w-6xl px-6 py-10 text-xs text-ink-faint">
-          Decisions are deterministic and policy-driven. Every outcome is fully traceable.
+          Decisions are policy-driven. Every outcome is fully traceable.
         </footer>
       </body>
     </html>
