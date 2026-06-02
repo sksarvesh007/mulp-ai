@@ -1,6 +1,6 @@
 # Render Blueprint — deploys the full stack as two Docker web services.
 # In the Render dashboard: New → Blueprint → pick this repo, then set the one secret
-# (DEEPSEEK_API_KEY) on the backend service. Everything else is wired automatically.
+# (OPENAI_API_KEY) on the backend service. Everything else is wired automatically.
 services:
   # ── FastAPI + LangGraph backend ────────────────────────────────────────────
   - type: web
@@ -13,13 +13,14 @@ services:
     autoDeploy: true
     envVars:
       - key: LLM_PROVIDER
-        value: deepseek
-      - key: DEEPSEEK_API_KEY
+        value: openai
+      # OpenAI gpt-5.5 is multimodal — it reads the document image directly (no OCR).
+      - key: OPENAI_API_KEY
         sync: false # ← set this in the Render dashboard (the only required secret)
-      - key: DEEPSEEK_BASE_URL
-        value: https://api.lkeap.cloud.tencent.com/v1
-      - key: DEEPSEEK_MODEL
-        value: deepseek-v3-0324
+      - key: OPENAI_BASE_URL
+        value: https://api.openai.com/v1
+      - key: OPENAI_MODEL
+        value: gpt-5.5
       - key: ENABLE_OBSERVABILITY
         value: "false"
       # The agentic (OpenAI-Agents-SDK) reviewer runs for EVERY streamed claim — demo
