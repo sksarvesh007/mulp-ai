@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut, useSession } from "@/lib/auth-client";
+import { Devlog } from "@/components/Devlog";
 
 const linkClass =
   "pressable rounded-md px-3 py-1.5 text-ink-muted hover:bg-surface-2 hover:text-ink";
@@ -31,6 +32,7 @@ export function HeaderNav() {
 
   return (
     <nav className="flex items-center gap-1 text-sm">
+      <Devlog />
       <Link href="/" onClick={onNewClaim} className={linkClass}>
         New claim
       </Link>
