@@ -72,7 +72,7 @@ export default function AnalyticsPage() {
         <Eyebrow>Operations</Eyebrow>
         <h1 className="mt-2 text-3xl text-ink">Analytics</h1>
         <p className="mt-1 text-sm text-ink-muted">
-          Aggregate view across every processed claim. Times shown in IST.
+          Aggregate view across every processed claim.
         </p>
       </div>
 
@@ -185,7 +185,7 @@ function Dashboard({ a }: { a: Analytics }) {
         </ChartCard>
 
         {/* Claims over time */}
-        <ChartCard title="Claims over time" hint="per day (IST)">
+        <ChartCard title="Claims over time" hint="per day">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={overTime} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
               <defs>

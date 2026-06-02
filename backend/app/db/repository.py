@@ -118,7 +118,10 @@ class ClaimRepository:
                 "approved_amount": r.approved_amount,
                 "confidence": r.confidence,
                 "degraded": r.degraded,
-                "created_at": r.created_at.isoformat() if r.created_at else None,
+                # created_at is stored naive-UTC; emit it as IST WITH an offset so the client
+                # parses it as an absolute instant (a tz-less string is read as the viewer's
+                # local time, which would mislabel the UTC clock reading as local).
+                "created_at": to_ist(r.created_at).isoformat() if r.created_at else None,
             }
             for r in records
         ]
