@@ -174,6 +174,7 @@ export interface UploadSample {
   bucket: "approved" | "rejected" | "hitl";
   label: string;
   description: string;
+  tc?: string; // the documented test case this example mirrors (e.g. "TC004"), if any
   form: {
     member_id: string;
     claim_category: string;

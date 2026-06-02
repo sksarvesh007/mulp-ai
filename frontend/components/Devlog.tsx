@@ -10,14 +10,17 @@ import { createPortal } from "react-dom";
 export function Devlog() {
   const [open, setOpen] = useState(false);
   const [hintSeen, setHintSeen] = useState(false);
+  const [zoomed, setZoomed] = useState<string | null>(null);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key !== "Escape") return;
+      if (zoomed) setZoomed(null);
+      else setOpen(false);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [zoomed]);
 
   const openDevlog = () => {
     setOpen(true);
@@ -88,14 +91,38 @@ export function Devlog() {
                   </li>
                   <li className="flex gap-2.5">
                     <span className="mt-px shrink-0 text-xs font-medium text-brand">02</span>
-                    <p>
-                      <span className="text-ink">The intake + document-upload pipeline can be slow,</span>{" "}
-                      and once in a while it stalls mid-run. If that happens, do a hard refresh and try
-                      again. Same root cause as above: the flaky LLM provider.
-                    </p>
+                    <div className="space-y-2">
+                      <p>
+                        <span className="text-ink">All the human-review feedback is captured as
+                        dataset items in Langfuse.</span> I would have self-hosted Langfuse and shared
+                        direct access, but free-tier compute made that impractical, so it lives on
+                        Langfuse Cloud for now.
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {["/image.png", "/image_2.png"].map((src) => (
+                          <button
+                            key={src}
+                            onClick={() => setZoomed(src)}
+                            className="pressable overflow-hidden rounded-md border border-border hover:border-brand/50"
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={src} alt="Langfuse dataset" className="h-28 w-full object-cover" />
+                          </button>
+                        ))}
+                      </div>
+                      <p className="text-[11px] text-ink-faint">Click an image to enlarge.</p>
+                    </div>
                   </li>
                   <li className="flex gap-2.5">
                     <span className="mt-px shrink-0 text-xs font-medium text-brand">03</span>
+                    <p>
+                      <span className="text-ink">The intake + document-upload pipeline can be slow,</span>{" "}
+                      and once in a while it stalls mid-run. If that happens, do a hard refresh and try
+                      again. Same root cause as the extraction: the flaky LLM provider.
+                    </p>
+                  </li>
+                  <li className="flex gap-2.5">
+                    <span className="mt-px shrink-0 text-xs font-medium text-brand">04</span>
                     <p>
                       <span className="text-ink">OCR is a plain (Tesseract) model for now,</span> purely
                       because of hardware limits. With better compute I would swap in a vision-language
@@ -103,20 +130,12 @@ export function Devlog() {
                     </p>
                   </li>
                   <li className="flex gap-2.5">
-                    <span className="mt-px shrink-0 text-xs font-medium text-brand">04</span>
+                    <span className="mt-px shrink-0 text-xs font-medium text-brand">05</span>
                     <p>
                       <span className="text-ink">
                         There might be one or two minor differences in the pipeline run to run
                       </span>{" "}
                       (atleast not a deterministic pipeline though).
-                    </p>
-                  </li>
-                  <li className="flex gap-2.5">
-                    <span className="mt-px shrink-0 text-xs font-medium text-brand">05</span>
-                    <p>
-                      <span className="text-ink">All the human-review feedback is captured as dataset
-                      items in Langfuse.</span> I would have self-hosted Langfuse and shared direct access,
-                      but free-tier compute made that impractical, so it lives on Langfuse Cloud for now.
                     </p>
                   </li>
                 </ol>
@@ -152,6 +171,22 @@ export function Devlog() {
               </section>
             </div>
           </div>
+          </div>,
+          document.body,
+        )}
+
+      {zoomed &&
+        createPortal(
+          <div
+            onClick={() => setZoomed(null)}
+            className="fixed inset-0 z-[110] flex items-center justify-center bg-black/85 p-6"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={zoomed}
+              alt="Langfuse (enlarged)"
+              className="max-h-[92vh] max-w-[94vw] rounded-lg shadow-2xl"
+            />
           </div>,
           document.body,
         )}

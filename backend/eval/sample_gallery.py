@@ -244,6 +244,19 @@ def _render_example(ex: dict[str, Any]) -> list[str]:
     return files
 
 
+# Which of the 12 documented test cases each example mirrors (shown as a badge in the UI).
+_TC = {
+    "approved_consultation": "TC004",
+    "approved_network": "TC010",
+    "approved_dental_partial": "TC006",
+    "rejected_waiting_diabetes": "TC005",
+    "rejected_excluded_bariatric": "TC012",
+    "rejected_per_claim_limit": "TC008",
+    "rejected_mri_no_preauth": "TC007",
+    "review_same_day": "TC009",
+}
+
+
 def main() -> None:
     from eval.sample_specs import EXAMPLES  # the curated catalogue (kept separate for clarity)
 
@@ -263,6 +276,7 @@ def main() -> None:
                 "description": ex["description"],
                 "form": ex["form"],
                 "files": [f"/samples/{ex['id']}/{f}" for f in files],
+                **({"tc": _TC[ex["id"]]} if ex["id"] in _TC else {}),
                 **({"seed": ex["seed"]} if ex.get("seed") else {}),
             }
         )

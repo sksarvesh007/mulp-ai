@@ -14,7 +14,8 @@
     "files": [
       "/samples/approved_consultation/prescription.png",
       "/samples/approved_consultation/hospital_bill.png"
-    ]
+    ],
+    "tc": "TC004"
   },
   {
     "id": "approved_network",
@@ -31,7 +32,8 @@
     "files": [
       "/samples/approved_network/prescription.png",
       "/samples/approved_network/hospital_bill.png"
-    ]
+    ],
+    "tc": "TC010"
   },
   {
     "id": "approved_dental_partial",
@@ -47,7 +49,8 @@
     },
     "files": [
       "/samples/approved_dental_partial/hospital_bill.png"
-    ]
+    ],
+    "tc": "TC006"
   },
   {
     "id": "rejected_waiting_diabetes",
@@ -64,7 +67,8 @@
     "files": [
       "/samples/rejected_waiting_diabetes/prescription.png",
       "/samples/rejected_waiting_diabetes/hospital_bill.png"
-    ]
+    ],
+    "tc": "TC005"
   },
   {
     "id": "rejected_excluded_bariatric",
@@ -81,7 +85,8 @@
     "files": [
       "/samples/rejected_excluded_bariatric/prescription.png",
       "/samples/rejected_excluded_bariatric/hospital_bill.png"
-    ]
+    ],
+    "tc": "TC012"
   },
   {
     "id": "rejected_per_claim_limit",
@@ -98,7 +103,8 @@
     "files": [
       "/samples/rejected_per_claim_limit/prescription.png",
       "/samples/rejected_per_claim_limit/hospital_bill.png"
-    ]
+    ],
+    "tc": "TC008"
   },
   {
     "id": "rejected_mri_no_preauth",
@@ -116,7 +122,8 @@
       "/samples/rejected_mri_no_preauth/prescription.png",
       "/samples/rejected_mri_no_preauth/lab_report.png",
       "/samples/rejected_mri_no_preauth/hospital_bill.png"
-    ]
+    ],
+    "tc": "TC007"
   },
   {
     "id": "review_high_value",
@@ -152,6 +159,7 @@
       "/samples/review_same_day/prescription.png",
       "/samples/review_same_day/hospital_bill.png"
     ],
+    "tc": "TC009",
     "seed": {
       "member_id": "EMP010",
       "treatment_date": "2024-11-05",

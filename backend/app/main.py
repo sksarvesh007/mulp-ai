@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from typing import Any
 
 import structlog
@@ -22,12 +24,25 @@ def _error(status: int, error: str, detail: Any) -> JSONResponse:
     return JSONResponse(status_code=status, content={"error": error, "detail": detail})
 
 
+@asynccontextmanager
+async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """Wire observability AFTER the server binds its port. Langfuse/OTel init can take
+    ~15-20s; doing it at import time delayed the port bind past the platform's deploy
+    port-scan timeout (the cause of an intermittent 'no open ports detected' deploy
+    failure). A telemetry hiccup must never block startup, so it is best-effort."""
+    try:
+        setup_observability(app, get_settings())
+    except Exception as exc:  # pragma: no cover - defensive; telemetry never blocks boot
+        log.warning("observability_setup_failed", error=str(exc))
+    yield
+
+
 def create_app() -> FastAPI:
-    settings = get_settings()
     app = FastAPI(
-        title="Plum Claims Processing API",
+        title="Mulp Claims Processing API",
         version="0.1.0",
         description="Multi-agent health-insurance claims adjudication (LangGraph).",
+        lifespan=_lifespan,
     )
     app.add_middleware(
         CORSMiddleware,
@@ -47,7 +62,6 @@ def create_app() -> FastAPI:
         return _error(500, "internal_error", "An unexpected error occurred while processing the request.")
 
     app.include_router(router)
-    setup_observability(app, settings)
     return app
 
 
