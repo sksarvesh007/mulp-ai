@@ -82,11 +82,12 @@ export function Devlog() {
                   <li className="flex gap-2.5">
                     <span className="mt-px shrink-0 text-xs font-medium text-brand">01</span>
                     <p>
-                      <span className="text-ink">LLM extraction can be a little flaky.</span> The
-                      provider&apos;s platform is not the most stable. I tried the free tiers from Groq
-                      and Gemini, but the rate limits ran out fast, so I am currently running on a
-                      provider I happened to find in a year-old GitHub repo. It does the job, but it is
-                      the least reliable part of the stack.
+                      <span className="text-ink">The LLM provider can be a bit unreliable.</span> Not the
+                      extraction itself, which is solid - it is the provider&apos;s platform (availability
+                      and rate limits) that is not the most stable. I tried the free tiers from Groq and
+                      Gemini, but the limits ran out fast, so I am currently on a provider I happened to
+                      find in a year-old GitHub repo. It does the job, but it is the least stable piece of
+                      the stack.
                     </p>
                   </li>
                   <li className="flex gap-2.5">
@@ -118,7 +119,7 @@ export function Devlog() {
                     <p>
                       <span className="text-ink">The intake + document-upload pipeline can be slow,</span>{" "}
                       and once in a while it stalls mid-run. If that happens, do a hard refresh and try
-                      again. Same root cause as the extraction: the flaky LLM provider.
+                      again. Same root cause: that flaky LLM provider.
                     </p>
                   </li>
                   <li className="flex gap-2.5">
