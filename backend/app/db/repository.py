@@ -12,8 +12,11 @@ from sqlmodel.sql.sqltypes import AutoString
 
 from app.core.config import get_settings
 from app.db.models import ClaimRecord
+from app.observability.logs import get_logger
 from app.schemas.claim import ClaimInput
 from app.schemas.decision import ClaimResult
+
+log = get_logger("app.store")
 
 
 class ClaimRepository:
@@ -66,6 +69,13 @@ class ClaimRepository:
         with Session(self.engine) as session:
             session.merge(record)  # upsert by claim_id
             session.commit()
+        log.debug(
+            "store.put",
+            claim_id=result.claim_id,
+            status=record.status,
+            decision=record.decision,
+            approved_amount=record.approved_amount,
+        )
 
     def get(self, claim_id: str) -> ClaimResult | None:
         with Session(self.engine) as session:

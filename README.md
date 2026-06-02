@@ -15,8 +15,8 @@ components degrade gracefully instead of crashing the request.
 | AI orchestration | LangGraph 1.2 (multi-agent graph, parallel `Send` fan-out for classify + extract, checkpointed HITL) |
 | Backend | FastAPI (async) + Pydantic v2, deterministic rule engine |
 | Frontend | Next.js 16 (App Router) + Tailwind v4, BetterAuth |
-| Perception | Tesseract OCR + DeepSeek (text) for live extraction; deterministic fixtures for eval |
-| Advisory agent | OpenAI Agents SDK on DeepSeek (explains the decision; off the critical path) |
+| Perception | OpenAI gpt-5.5 vision reads document images directly (no OCR) for live extraction; deterministic fixtures for eval |
+| Advisory agent | OpenAI Agents SDK on gpt-5.5 (explains the decision; off the critical path) |
 | Persistence | Supabase (claims ledger for cross-submission fraud velocity) + SQLite (ops history) |
 | Observability | Domain decision-trace + Langfuse (generations, agent tool calls, eval datasets) |
 
@@ -64,7 +64,7 @@ verdict.
 
 ## Advisory AI reviewer
 
-An optional reviewer (OpenAI Agents SDK on DeepSeek, with policy-lookup tools) runs off the critical
+An optional reviewer (OpenAI Agents SDK on gpt-5.5, with policy-lookup tools) runs off the critical
 path after the decision has been made. It does not re-decide: it is handed the deterministic
 decision and explains it in plain language, then tells the member what to do next. Its generations
 and tool calls are captured in Langfuse. Toggle with `ENABLE_AGENTIC_REVIEW`.
@@ -83,11 +83,11 @@ decision. This works both for the demo scenarios and for live document uploads.
 - Upload documents: a gallery of realistic sample documents (generated hospital bills,
   prescriptions, and lab reports with letterhead, itemized tables, and a paid stamp), also grouped
   by outcome. Selecting one prefills the claim form and loads the document images; "Run with AI"
-  then drives the real OCR -> DeepSeek -> engine path. You can also upload your own files.
+  then drives the real gpt-5.5 vision -> engine path. You can also upload your own files.
 
 ## Resilience
 
-- SSE heartbeats keep a streaming upload alive through long OCR/LLM gaps, so a slow node is not cut
+- SSE heartbeats keep a streaming upload alive through long vision/LLM gaps, so a slow node is not cut
   by a proxy idle-timeout mid-pipeline.
 - Bounded LLM timeouts, so a stuck model call fails fast and degrades into a clean decision instead
   of hanging the request.
@@ -109,7 +109,7 @@ and seeded into the image at build time, so login works out of the box.
 
 ```bash
 # backend
-cd backend && uv sync && cp .env.example .env   # add DEEPSEEK_API_KEY for the live LLM path
+cd backend && uv sync && cp .env.example .env   # add OPENAI_API_KEY for the live LLM path
 uv run uvicorn app.main:app --reload --port 8000
 
 # frontend (new terminal)
@@ -132,7 +132,7 @@ docker compose -f infra/docker-compose.yml up --build
 ```bash
 cd backend
 uv run python -m eval.harness         # 12/12 deterministic, writes docs/EVAL_REPORT.md
-uv run python -m eval.live_harness    # 12/12 through the live OCR + DeepSeek path
+uv run python -m eval.live_harness    # 12/12 through the live gpt-5.5 vision path
 uv run python -m eval.agent_eval      # live engine decision + advisory-agent answer per case
 uv run python -m eval.sample_gallery  # regenerate the realistic upload-tab sample documents
 ```
@@ -186,9 +186,9 @@ backend/
     policy/         PolicyRepository - loads policy_terms.json at runtime
     engine/         deterministic rules: gate (incl. claim/document consistency), eligibility,
                     fraud, adjudication, confidence, invariants
-    extraction/     Extractor protocol + EvalExtractor + LiveExtractor (Tesseract + DeepSeek)
+    extraction/     Extractor protocol + EvalExtractor + LiveExtractor (gpt-5.5 vision)
     agentic/        advisory OpenAI-Agents-SDK reviewer (explains the decision)
-    llm/            shared DeepSeek JSON client
+    llm/            shared OpenAI JSON / vision client
     graph/          LangGraph state, nodes, build, runner (run + SSE stream + checkpointed HITL)
     db/             ClaimRepository (SQLite ops history) + ledger (Supabase fraud velocity)
     api/            FastAPI routes (SSE upload/stream, HITL resume, review, sample seed)
@@ -208,7 +208,7 @@ The stack deploys from the [`render.yaml`](render.yaml) Blueprint as `mulp-claim
 `mulp-claims-frontend`.
 
 1. In the Render dashboard: New -> Blueprint, pick this repo, Apply.
-2. On the backend service, set `DEEPSEEK_API_KEY` (the live LLM path). For the fraud-velocity
+2. On the backend service, set `OPENAI_API_KEY` (the live LLM path). For the fraud-velocity
    ledger, also set `SUPABASE_URL` and `SUPABASE_KEY` and create the `claims` table (SQL above).
    Optionally set `ENABLE_AGENTIC_REVIEW=true` to show the advisory reviewer.
 3. The frontend proxies `/api/*` to the backend at runtime (`app/api/[...path]/route.ts`), so the

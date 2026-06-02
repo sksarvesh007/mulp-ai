@@ -2,7 +2,7 @@
 downstream node is agnostic to the perception layer:
 
   EvalExtractor  — deterministic; trusts the provided content/hints (test harness)
-  LiveExtractor  — real LLM (Gemini vision, or DeepSeek text via OCR) for uploads
+  LiveExtractor  — real multimodal LLM (gpt-5.5 reads the document image directly) for uploads
 
 Contract
 --------

@@ -5,6 +5,7 @@ crash. Custom progress events are streamed via a guarded stream writer."""
 from __future__ import annotations
 
 import functools
+import time
 from collections.abc import Awaitable, Callable
 from typing import Any
 
@@ -26,11 +27,14 @@ from app.engine.results import AdjudicationResult, EligibilityResult, FraudResul
 from app.engine.trace_util import ev
 from app.engine.view import ClaimView
 from app.graph.state import ClaimState
+from app.observability.logs import get_logger
 from app.schemas.decision import ClaimDecision, HumanReviewRequest, HumanReviewVerdict
 from app.schemas.enums import ClaimStatus, Decision, TraceStatus
 from app.schemas.trace import ComponentFailure
 
 NodeFn = Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]
+
+log = get_logger("app.graph.node")
 
 
 def _writer() -> Callable[[dict[str, Any]], None]:
@@ -70,16 +74,28 @@ def resilient_node(name: str) -> Callable[..., Any]:
         @functools.wraps(fn)
         async def wrapper(state: dict[str, Any]) -> dict[str, Any]:
             write = _writer()
+            start = time.perf_counter()
             try:
                 write({"event": "node_start", "node": name})
                 out = await fn(state)
                 write({"event": "node_done", "node": name})
+                log.info("node.done", node=name, elapsed_ms=round((time.perf_counter() - start) * 1000, 1))
                 return out or {}
             except Exception as exc:  # graceful degradation (TC011)
                 # Keep the raw exception for logs/observability, but NEVER surface a
                 # `RuntimeError: ...` string to the UI — show a clean degradation notice.
                 msg = f"{type(exc).__name__}: {exc}"
                 write({"event": "node_error", "node": name, "error": msg})
+                # A node failure degrades the pipeline rather than crashing it — log it at
+                # ERROR (with the traceback) so the swallowed exception is never invisible.
+                log.error(
+                    "node.failed",
+                    node=name,
+                    error=str(exc),
+                    error_type=type(exc).__name__,
+                    elapsed_ms=round((time.perf_counter() - start) * 1000, 1),
+                    exc_info=True,
+                )
                 return {
                     "failures": [
                         ComponentFailure(

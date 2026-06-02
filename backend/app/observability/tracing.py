@@ -13,7 +13,10 @@ from functools import lru_cache
 from typing import Any
 
 from app.core.config import get_settings
+from app.observability.logs import get_logger
 from app.schemas.decision import ClaimResult
+
+log = get_logger("app.tracing")
 
 
 @lru_cache
@@ -74,6 +77,7 @@ def _emit(result: ClaimResult) -> None:  # pragma: no cover
                 except Exception:
                     pass
         lf.flush()
-    except Exception:
-        # observability must never break adjudication
-        pass
+        log.debug("langfuse.trace_emitted", claim_id=result.claim_id, spans=len(result.trace))
+    except Exception as exc:
+        # observability must never break adjudication — but record why a trace was dropped
+        log.warning("langfuse.emit_failed", claim_id=result.claim_id, error=str(exc), error_type=type(exc).__name__)

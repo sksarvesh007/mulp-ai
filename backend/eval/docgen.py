@@ -2,7 +2,7 @@
 
 Each case's documents are drawn as clear, OCR-friendly images. The generated
 DocumentInputs carry NO ``actual_type`` and NO ``content`` — only an ``image_ref`` —
-so the live pipeline must classify and extract them with the LLM (OCR → DeepSeek).
+so the live pipeline must classify and extract them with the LLM (gpt-5.5 vision).
 The ``quality: UNREADABLE`` hint is rendered as a heavily-degraded image so OCR fails.
 """
 

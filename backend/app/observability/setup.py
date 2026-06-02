@@ -13,6 +13,7 @@ them. Structured logging (structlog) is always configured.
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 import structlog
 from fastapi import FastAPI
@@ -20,20 +21,35 @@ from fastapi import FastAPI
 from app.core.config import Settings
 
 
-def setup_logging(level: str = "INFO") -> None:
-    logging.basicConfig(level=getattr(logging, level.upper(), logging.INFO), format="%(message)s")
+def setup_logging(level: str = "INFO", *, json_logs: bool = True) -> None:
+    """Configure structlog. ``json_logs=False`` renders a pretty, colourised console (used
+    locally); ``True`` renders one JSON object per line (used in deploys, for log shippers).
+
+    ``merge_contextvars`` injects request/claim identifiers bound via ``logs.bind`` onto every
+    line, and ``format_exc_info`` renders any attached exception (e.g. ``log.error(..., exc_info=…)``).
+    """
+    log_level = getattr(logging, level.upper(), logging.INFO)
+    logging.basicConfig(level=log_level, format="%(message)s")
+    renderer: Any = (
+        structlog.processors.JSONRenderer() if json_logs else structlog.dev.ConsoleRenderer(colors=True)
+    )
     structlog.configure(
         processors=[
+            structlog.contextvars.merge_contextvars,
             structlog.processors.add_log_level,
             structlog.processors.TimeStamper(fmt="iso"),
-            structlog.processors.JSONRenderer(),
+            structlog.processors.StackInfoRenderer(),
+            structlog.processors.format_exc_info,
+            renderer,
         ],
-        wrapper_class=structlog.make_filtering_bound_logger(getattr(logging, level.upper(), logging.INFO)),
+        wrapper_class=structlog.make_filtering_bound_logger(log_level),
+        cache_logger_on_first_use=True,
     )
 
 
 def setup_observability(app: FastAPI, settings: Settings) -> None:
-    setup_logging(settings.log_level)
+    # Pretty console locally, structured JSON everywhere else (deploys aggregate JSON lines).
+    setup_logging(settings.log_level, json_logs=settings.app_env != "local")
     if not settings.enable_observability:
         return
     _wire_telemetry(app, settings)  # pragma: no cover - optional deps + network

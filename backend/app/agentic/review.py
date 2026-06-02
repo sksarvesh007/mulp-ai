@@ -1,6 +1,6 @@
 """Optional OpenAI-Agents-SDK reviewer — an advisory perception node.
 
-An ``Agent`` (running on the configured DeepSeek model) is given **policy tools** it can
+An ``Agent`` (running on the configured OpenAI model) is given **policy tools** it can
 call to look up document requirements, member details, category coverage terms and fraud
 thresholds, then it returns a plain-language assessment of the claim.
 
@@ -106,7 +106,6 @@ async def run_agentic_review(  # pragma: no cover - network + SDK
     """Run the Agents-SDK reviewer. Returns ``None`` if no model is configured."""
     from agents import (
         Agent,
-        ModelSettings,
         OpenAIChatCompletionsModel,
         Runner,
         function_tool,
@@ -115,14 +114,14 @@ async def run_agentic_review(  # pragma: no cover - network + SDK
     from openai import AsyncOpenAI
 
     from app.core.config import get_settings
-    from app.llm.deepseek import extract_json
+    from app.llm.openai_client import extract_json
 
     s = get_settings()
-    if not s.deepseek_api_key:
+    if not s.openai_api_key:
         return None
     # Keep the Agents SDK tracing ON when observability is enabled, so the OpenInference
     # instrumentor can export the agent's generations + tool calls to Langfuse. Otherwise
-    # disable it (its default backend is OpenAI's hosted tracing; we use DeepSeek).
+    # disable it.
     set_tracing_disabled(not s.enable_observability)
 
     @function_tool
@@ -146,8 +145,8 @@ async def run_agentic_review(  # pragma: no cover - network + SDK
         return fraud_thresholds_text()
 
     client = AsyncOpenAI(
-        api_key=s.deepseek_api_key,
-        base_url=s.deepseek_base_url,
+        api_key=s.openai_api_key,
+        base_url=s.openai_base_url,
         timeout=s.llm_timeout_s,
         max_retries=s.llm_max_retries,
     )
@@ -155,11 +154,10 @@ async def run_agentic_review(  # pragma: no cover - network + SDK
         name="Claim reviewer",
         instructions=_INSTRUCTIONS,
         tools=[required_documents, member_profile, category_terms, fraud_thresholds],
-        model=OpenAIChatCompletionsModel(model=s.deepseek_model, openai_client=client),
-        model_settings=ModelSettings(temperature=0),
+        model=OpenAIChatCompletionsModel(model=s.openai_model, openai_client=client),
     )
-    # DeepSeek doesn't honour the SDK's strict structured-output mode, so let the agent
-    # finish in free text and parse the JSON ourselves (same approach as extraction).
+    # Let the agent finish in free text and parse the JSON ourselves (same approach as
+    # extraction) — robust to any prose/fences and avoids the SDK's strict-mode constraints.
     prompt = build_review_prompt(claim, view, documents_provided, decision=decision)
     result = await Runner.run(agent, prompt, max_turns=6)
     text = str(result.final_output or "")

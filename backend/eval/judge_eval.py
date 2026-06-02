@@ -2,7 +2,7 @@
 
 For each folder we treat it as a **complete pipeline input** — the image files are
 OCR'd + extracted by the live model, and ``claim.json`` carries the rest of the claim
-metadata. We run the **live** pipeline (Tesseract OCR → DeepSeek → adjudication) and
+metadata. We run the **live** pipeline (gpt-5.5 vision → adjudication) and
 then ask the LLM **judge** whether the actual decision matches the folder's documented
 ``flow.txt`` expectation. There is no deterministic assertion of the outcome — the judge
 decides (the only deterministic part is a tiny invariant sanity check that can never
@@ -29,7 +29,7 @@ from typing import Any
 
 from app.core.config import get_settings
 from app.graph import run_claim
-from app.llm.deepseek import deepseek_json
+from app.llm.openai_client import openai_json
 from app.observability.datasets import JUDGE_DATASET
 from app.observability.tracing import get_langfuse
 from app.schemas.claim import ClaimInput, DocumentInput
@@ -84,7 +84,7 @@ def actual_summary(result: ClaimResult) -> dict[str, Any]:
 
 async def judge(expected_text: str, actual: dict[str, Any]) -> dict[str, Any]:
     prompt = _JUDGE_PROMPT.format(expected=expected_text, actual=json.dumps(actual, indent=2))
-    data = await deepseek_json(prompt)
+    data = await openai_json(prompt)
     return {
         "match": bool(data.get("match")),
         "reason": str(data.get("reason", "")),
@@ -176,7 +176,7 @@ def _write_report(rows: list[tuple[str, bool, str, str]], n_pass: int) -> None:
         "# LLM-as-Judge Eval Report (upload_docs folders)",
         "",
         f"**Result: {n_pass}/{len(rows)} folders judged correct.** Each folder under "
-        "`~/Downloads/upload_docs/` is run through the *live* pipeline (Tesseract OCR → DeepSeek → "
+        "`~/Downloads/upload_docs/` is run through the *live* pipeline (gpt-5.5 vision → "
         "adjudication), then an **LLM judge** decides whether the actual decision matches the "
         "folder's documented `flow.txt` expectation — no hard-coded assertions. Every case is "
         "logged to Langfuse (trace + `judge_match` score + `plum-claims-judge` dataset item). "

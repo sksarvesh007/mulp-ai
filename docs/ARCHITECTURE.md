@@ -26,8 +26,8 @@ is unit-testable to the rupee and can never hallucinate, and the traces are trus
 │  decision)  │     │      │            │ PERCEPTION (LLM)            DECISION (deterministic)   │    │
 └─────────────┘     │      │            │  extraction/                engine/                    │    │
                     │      │            │   EvalExtractor              gate · eligibility ·       │    │
-                    │      ▼            │   LiveExtractor (DeepSeek/   fraud · adjudication ·     │    │
-                    │   api/store      │   Gemini, behind Protocol)   confidence · decide        │    │
+                    │      ▼            │   LiveExtractor (gpt-5.5     fraud · adjudication ·     │    │
+                    │   api/store      │   vision, behind Protocol)   confidence · decide        │    │
                     │  (in-memory)     │            │                          │                  │    │
                     │                  │            └────────► policy/PolicyRepository ◄──────────┘    │
                     │                  │                         (reads docs/policy_terms.json)        │
@@ -128,10 +128,11 @@ The domain trace is the source of truth for *why*; Langfuse/OTel are engineering
   responsibilities, the multi-agent bonus, and parallel per-document work.
 - **Pydantic models on graph state → avoided** in favour of `TypedDict` + reducers, which
   serialize cleanly through checkpointers and make concurrent fan-in writes safe.
-- **Real OCR for the eval → rejected.** Test cases ship structured `content`; trusting it in
+- **Real vision for the eval → rejected.** Test cases ship structured `content`; trusting it in
   eval mode keeps the 12 cases deterministic while the same nodes run real extraction live.
-- **DeepSeek for vision → not possible** (text-only); kept behind the `Extractor` Protocol
-  so Gemini (multimodal) drops in with a key, with Tesseract→DeepSeek as a stopgap.
+- **OCR as a separate step → removed.** The live path sends the document image straight to a
+  multimodal model (gpt-5.5), which reads and structures it in one call. The perception layer
+  stays behind the `Extractor` Protocol, so swapping the model/provider touches one module.
 
 ## 9. Limitations & scaling to 10×
 

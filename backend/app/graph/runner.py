@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 import uuid
 from collections.abc import AsyncIterator
 from typing import Any
@@ -12,15 +13,31 @@ from app.core.config import get_settings
 from app.db.ledger import load_member_history, record_claim
 from app.engine.trace_util import ev
 from app.graph.build import get_graph, get_hitl_graph
+from app.observability import logs
+from app.observability.logs import log_stage
 from app.observability.tracing import log_claim_trace
 from app.schemas.claim import ClaimInput
 from app.schemas.decision import ClaimDecision, ClaimResult, HumanReviewRequest, HumanReviewVerdict
 from app.schemas.enums import ClaimStatus, TraceStatus
 from app.schemas.trace import TraceEvent
 
+log = logs.get_logger("app.claim")
+
 
 def _claim_id(claim: ClaimInput, claim_id: str | None) -> str:
     return claim_id or claim.claim_id or f"CLM_{uuid.uuid4().hex[:10]}"
+
+
+def _decision_fields(result: ClaimResult) -> dict[str, Any]:
+    """The decision summary fields logged when a claim finishes (one flat dict)."""
+    d = result.decision
+    return {
+        "decision": d.decision.value if d.decision else None,
+        "status": d.status.value if d.status else None,
+        "approved_amount": d.approved_amount,
+        "degraded": d.degraded,
+        "trace_events": len(result.trace),
+    }
 
 
 def _assemble(cid: str, final: dict[str, Any]) -> ClaimResult:
@@ -42,10 +59,21 @@ def _assemble(cid: str, final: dict[str, Any]) -> ClaimResult:
 
 async def run_claim(claim: ClaimInput, *, claim_id: str | None = None) -> ClaimResult:
     cid = _claim_id(claim, claim_id)
-    await load_member_history(claim)  # LIVE-only: pull the member's prior claims for fraud velocity
-    final = await get_graph().ainvoke({"claim": claim})
-    result = _assemble(cid, final)
-    await record_claim(claim, result)  # LIVE-only: persist this submission to the ledger
+    logs.bind(claim_id=cid)
+    with log_stage(
+        log,
+        "claim.run",
+        member_id=claim.member_id,
+        category=claim.claim_category.value,
+        mode=claim.mode.value,
+        claimed_amount=claim.claimed_amount,
+        documents=len(claim.documents),
+    ) as summary:
+        await load_member_history(claim)  # LIVE-only: pull the member's prior claims for fraud velocity
+        final = await get_graph().ainvoke({"claim": claim})
+        result = _assemble(cid, final)
+        await record_claim(claim, result)  # LIVE-only: persist this submission to the ledger
+        summary.update(_decision_fields(result))
     return result
 
 
@@ -56,6 +84,14 @@ async def run_claim_hitl(claim: ClaimInput, *, claim_id: str | None = None) -> C
     ``claim_id`` is the checkpoint thread_id used to resume. Otherwise it returns the final
     decision exactly like ``run_claim``."""
     cid = _claim_id(claim, claim_id)
+    logs.bind(claim_id=cid)
+    log.info(
+        "claim.run.start",
+        member_id=claim.member_id,
+        category=claim.claim_category.value,
+        mode=claim.mode.value,
+        hitl=True,
+    )
     config = {"configurable": {"thread_id": cid}}
     final = await get_hitl_graph().ainvoke({"claim": claim}, config=config)
 
@@ -70,25 +106,34 @@ async def run_claim_hitl(claim: ClaimInput, *, claim_id: str | None = None) -> C
         )
         trace = sorted(final.get("trace_events", []), key=lambda e: e.ts or "")
         result = ClaimResult(claim_id=cid, decision=decision, trace=trace, review_request=request)
+        log.info("claim.pending_review", reason=request.reason, fraud_signals=len(request.fraud_signals or []))
         log_claim_trace(result)
         return result
 
-    return _assemble(cid, final)  # non-MANUAL_REVIEW HITL claims fall through unchanged
+    result = _assemble(cid, final)  # non-MANUAL_REVIEW HITL claims fall through unchanged
+    log.info("claim.run.done", **_decision_fields(result))
+    return result
 
 
 async def resume_claim(*, claim_id: str, verdict: HumanReviewVerdict) -> ClaimResult:
     """Resume a paused claim from its checkpoint with a human's verdict. The checkpoint
     already holds the full state (incl. the claim), so only the thread_id + verdict are
     needed; the graph re-enters ``human_review``, applies the verdict, and finalises."""
+    logs.bind(claim_id=claim_id)
+    log.info("claim.resume.start", action=verdict.action, reviewer=verdict.reviewer or None)
     config = {"configurable": {"thread_id": claim_id}}
     final = await get_hitl_graph().ainvoke(Command(resume=verdict.model_dump()), config=config)
-    return _assemble(claim_id, final)
+    result = _assemble(claim_id, final)
+    log.info("claim.resume.done", **_decision_fields(result))
+    return result
 
 
 async def stream_claim(claim: ClaimInput, *, claim_id: str | None = None) -> AsyncIterator[dict[str, Any]]:
     """Stream pipeline progress events, then a final ``result`` event carrying the
     full ClaimResult. Used by the SSE endpoint to drive the live UI."""
     cid = _claim_id(claim, claim_id)
+    logs.bind(claim_id=cid)
+    started = time.perf_counter()
     decision: ClaimDecision | None = None
     trace: list[Any] = []
     failures: list[Any] = []
@@ -97,6 +142,14 @@ async def stream_claim(claim: ClaimInput, *, claim_id: str | None = None) -> Asy
     extracted_docs: list[Any] = []
     interrupt_value: Any = None
 
+    log.info(
+        "claim.stream.start",
+        member_id=claim.member_id,
+        category=claim.claim_category.value,
+        mode=claim.mode.value,
+        hitl=claim.hitl,
+        documents=len(claim.documents),
+    )
     await load_member_history(claim)  # LIVE-only: prior submissions feed the fraud velocity check
     # A HITL claim (e.g. an upload that may need human review) streams through the CHECKPOINTED
     # graph so a MANUAL_REVIEW outcome PAUSES at human_review instead of finalising; everything
@@ -140,6 +193,13 @@ async def stream_claim(claim: ClaimInput, *, claim_id: str | None = None) -> Asy
         trace.sort(key=lambda e: e.ts or "")
         result = ClaimResult(claim_id=cid, decision=pending, trace=trace, review_request=request)
         await record_claim(claim, result)  # the submission is logged even while it awaits review
+        log.info(
+            "claim.stream.pending_review",
+            reason=request.reason,
+            fraud_signals=len(request.fraud_signals or []),
+            trace_events=len(trace),
+            elapsed_ms=round((time.perf_counter() - started) * 1000, 1),
+        )
         yield {"type": "pending_review", "result": result}
         log_claim_trace(result)
         return
@@ -152,6 +212,11 @@ async def stream_claim(claim: ClaimInput, *, claim_id: str | None = None) -> Asy
     trace.sort(key=lambda e: e.ts or "")
     result = ClaimResult(claim_id=cid, decision=decision, trace=trace)
     await record_claim(claim, result)  # LIVE-only: persist this submission to the ledger
+    log.info(
+        "claim.stream.result",
+        elapsed_ms=round((time.perf_counter() - started) * 1000, 1),
+        **_decision_fields(result),
+    )
     yield {"type": "result", "result": result}
 
     # The advisory AI agent runs OFF the critical path: the decision has already streamed,
@@ -205,6 +270,12 @@ async def _maybe_run_agentic_review(
         from app.agentic.review import run_agentic_review
 
         doc_types = [d.doc_type.value for d in extracted_docs]
-        return await run_agentic_review(claim, view, doc_types, decision=decision)
-    except Exception:  # pragma: no cover - advisory only; must never break the stream
+        with log_stage(log, "claim.agentic_review", documents=len(doc_types)) as summary:
+            assessment = await run_agentic_review(claim, view, doc_types, decision=decision)
+            summary["tools_used"] = assessment.tools_used if assessment else []
+            summary["produced"] = assessment is not None
+        return assessment
+    except Exception as exc:  # pragma: no cover - advisory only; must never break the stream
+        # Advisory only — the decision already streamed — but never swallow it silently.
+        log.warning("claim.agentic_review.failed", error=str(exc), error_type=type(exc).__name__)
         return None

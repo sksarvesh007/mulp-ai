@@ -32,44 +32,94 @@ async def test_extract_without_content_or_image_degrades() -> None:
     assert "NO_CONTENT_OR_IMAGE" in e.notes
 
 
-def test_safe_ocr_dedupes_per_image_ref(monkeypatch) -> None:
-    """classify() + extract() share one OCR pass per document: _safe_ocr OCRs an
+def test_safe_images_dedupes_per_image_ref(monkeypatch) -> None:
+    """classify() + extract() share one image load per document: _safe_images loads an
     image_ref once, caches it, and serves later calls from the cache."""
     e = LiveExtractor()
     calls = {"n": 0}
 
-    def fake_ocr(image_ref):  # type: ignore[no-untyped-def]
+    def fake_load(image_ref):  # type: ignore[no-untyped-def]
         calls["n"] += 1
-        return f"ocr-text for {image_ref}"
+        return [f"data:image/jpeg;base64,for {image_ref}"]
 
-    monkeypatch.setattr(e, "_ocr", fake_ocr)
+    monkeypatch.setattr(e, "_load_images", fake_load)
 
-    assert e._safe_ocr(None) == ""  # no image_ref → empty, never OCRs
+    assert e._safe_images(None) == []  # no image_ref → empty, never loads
     assert calls["n"] == 0
 
-    first = e._safe_ocr("/tmp/doc.png")  # OCRs once, populates the cache
-    assert first == "ocr-text for /tmp/doc.png"
+    first = e._safe_images("/tmp/doc.png")  # loads once, populates the cache
+    assert first == ["data:image/jpeg;base64,for /tmp/doc.png"]
     assert calls["n"] == 1
 
-    second = e._safe_ocr("/tmp/doc.png")  # cache hit — no second OCR pass
+    second = e._safe_images("/tmp/doc.png")  # cache hit — no second load
     assert second == first
     assert calls["n"] == 1
 
 
-def test_safe_ocr_caches_failures(monkeypatch) -> None:
-    """A failing OCR is caught (returns "") and the empty result is cached, so a flaky
+def test_safe_images_caches_failures(monkeypatch) -> None:
+    """A failing load is caught (returns []) and the empty result is cached, so a flaky
     read isn't retried twice within one claim."""
     e = LiveExtractor()
     calls = {"n": 0}
 
     def boom(image_ref):  # type: ignore[no-untyped-def]
         calls["n"] += 1
-        raise RuntimeError("ocr unavailable")
+        raise RuntimeError("file unavailable")
 
-    monkeypatch.setattr(e, "_ocr", boom)
-    assert e._safe_ocr("/tmp/x.png") == ""
-    assert e._safe_ocr("/tmp/x.png") == ""
+    monkeypatch.setattr(e, "_load_images", boom)
+    assert e._safe_images("/tmp/x.png") == []
+    assert e._safe_images("/tmp/x.png") == []
     assert calls["n"] == 1
+
+
+async def test_single_vision_call_shared_by_classify_and_extract(monkeypatch) -> None:
+    """classify() + extract() are served by ONE combined vision call per document: _perceive
+    calls the model once, caches (status, data), and both public methods read from it — so the
+    one call both classifies the document (type/relevance) and extracts the key details."""
+    import app.extraction.live_extractor as mod
+
+    e = LiveExtractor()
+    monkeypatch.setattr(e, "_load_images", lambda ref: ["data:image/jpeg;base64,xxx"])
+    calls = {"n": 0}
+
+    async def fake_vision(prompt, images, settings=None):  # type: ignore[no-untyped-def]
+        calls["n"] += 1
+        return {
+            "doc_type": "HOSPITAL_BILL",
+            "patient_name": "Asha",
+            "total": 1200,
+            "line_items": [{"description": "Room", "amount": 1200}],
+        }
+
+    monkeypatch.setattr(mod, "openai_vision_json", fake_vision)
+
+    doc = DocumentInput(file_id="U1", file_name="bill.png", image_ref="/tmp/bill.png")
+    c = await e.classify(doc)
+    x = await e.extract(doc)
+
+    assert calls["n"] == 1  # ONE round-trip total, shared across classify + extract
+    assert c.doc_type == DocumentType.HOSPITAL_BILL and c.patient_name == "Asha"
+    assert x.ok is True and x.doc_type == DocumentType.HOSPITAL_BILL and x.total == 1200
+
+
+async def test_extract_degrades_unreadable_when_image_fails(monkeypatch) -> None:
+    """When the image can't be loaded, the combined call is skipped and extract() degrades
+    cleanly to ok=False / UNREADABLE (no model round-trip)."""
+    import app.extraction.live_extractor as mod
+
+    e = LiveExtractor()
+    monkeypatch.setattr(e, "_load_images", lambda ref: [])  # nothing loadable
+    called = {"n": 0}
+
+    async def fake_vision(*a, **k):  # type: ignore[no-untyped-def]
+        called["n"] += 1
+        return {}
+
+    monkeypatch.setattr(mod, "openai_vision_json", fake_vision)
+
+    x = await e.extract(DocumentInput(file_id="U1", file_name="x.png", image_ref="/tmp/x.png"))
+    assert x.ok is False and "UNREADABLE" in x.notes
+    assert called["n"] == 0  # never round-trips when there's no image
 
 
 def test_observability_noop_when_disabled() -> None:
@@ -98,7 +148,7 @@ def test_guess_doc_type() -> None:
 
 
 def test_extract_json_handles_fences_and_prose() -> None:
-    from app.llm.deepseek import extract_json
+    from app.llm.openai_client import extract_json
 
     assert extract_json('```json\n{"doc_type": "PRESCRIPTION"}\n```') == {"doc_type": "PRESCRIPTION"}
     assert extract_json('Here is the result: {"total": 1500} cheers') == {"total": 1500}

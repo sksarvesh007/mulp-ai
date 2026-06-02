@@ -24,9 +24,12 @@ from __future__ import annotations
 import httpx
 
 from app.core.config import get_settings
+from app.observability.logs import get_logger
 from app.schemas.claim import ClaimHistoryItem, ClaimInput
 from app.schemas.decision import ClaimResult
 from app.schemas.enums import ExtractionMode
+
+log = get_logger("app.ledger")
 
 _TIMEOUT = 8.0
 
@@ -77,8 +80,11 @@ async def load_member_history(claim: ClaimInput) -> None:  # pragma: no cover - 
         ]
         if prior:
             claim.claims_history = [*claim.claims_history, *prior]
-    except Exception:
-        return  # best-effort: a ledger hiccup must never block a decision
+        log.info("ledger.history_loaded", member_id=claim.member_id, prior_claims=len(prior))
+    except Exception as exc:
+        # best-effort: a ledger hiccup must never block a decision — but log it, don't hide it
+        log.warning("ledger.history_failed", member_id=claim.member_id, error=str(exc), error_type=type(exc).__name__)
+        return
 
 
 async def record_claim(claim: ClaimInput, result: ClaimResult) -> None:  # pragma: no cover - network I/O
@@ -111,8 +117,11 @@ async def record_claim(claim: ClaimInput, result: ClaimResult) -> None:  # pragm
                 headers={**headers, "Prefer": "resolution=merge-duplicates,return=minimal"},
             )
             resp.raise_for_status()
-    except Exception:
-        return  # best-effort: persistence failure must never break the response
+        log.info("ledger.recorded", claim_id=result.claim_id, status_code=resp.status_code)
+    except Exception as exc:
+        # best-effort: persistence failure must never break the response — but log it
+        log.warning("ledger.record_failed", claim_id=result.claim_id, error=str(exc), error_type=type(exc).__name__)
+        return
 
 
 async def seed_history(member_id: str, treatment_date: str, count: int) -> int:  # pragma: no cover - network I/O
@@ -148,6 +157,8 @@ async def seed_history(member_id: str, treatment_date: str, count: int) -> int: 
                 headers={**headers, "Prefer": "resolution=merge-duplicates,return=minimal"},
             )
             resp.raise_for_status()
+        log.info("ledger.seeded", member_id=member_id, rows=len(rows))
         return len(rows)
-    except Exception:
+    except Exception as exc:
+        log.warning("ledger.seed_failed", member_id=member_id, error=str(exc), error_type=type(exc).__name__)
         return 0

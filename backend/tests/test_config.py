@@ -18,13 +18,12 @@ def test_relative_path_resolves_against_repo_root() -> None:
     assert s.policy_file.name == "policy_terms.json"
 
 
-def test_has_llm_deepseek() -> None:
-    assert Settings(llm_provider="deepseek", deepseek_api_key="x").has_llm is True
-    assert Settings(llm_provider="deepseek", deepseek_api_key="").has_llm is False
+def test_has_llm_openai() -> None:
+    assert Settings(openai_api_key="x").has_llm is True
+    assert Settings(openai_api_key="").has_llm is False
 
 
-def test_has_llm_gemini_and_vision() -> None:
-    g = Settings(llm_provider="gemini", google_api_key="x")
-    assert g.has_llm is True
-    assert g.supports_vision is True
-    assert Settings(llm_provider="deepseek", deepseek_api_key="x").supports_vision is False
+def test_supports_vision_with_key() -> None:
+    # the OpenAI base model reads images directly — vision is available whenever a key is set
+    assert Settings(openai_api_key="x").supports_vision is True
+    assert Settings(openai_api_key="").supports_vision is False

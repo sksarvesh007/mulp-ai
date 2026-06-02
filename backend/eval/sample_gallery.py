@@ -2,7 +2,7 @@
 plus a manifest the frontend uses to one-click prefill the file picker AND the claim form.
 
 Each example is a real claim shape (form values + matching documents) curated to land on a
-specific outcome through the LIVE pipeline (OCR → DeepSeek → deterministic engine):
+specific outcome through the LIVE pipeline (gpt-5.5 vision → deterministic engine):
 
     APPROVED      clean consultation · network-hospital discount · dental partial
     REJECTED      diabetes waiting period · excluded (bariatric) · per-claim limit · MRI no pre-auth
@@ -10,7 +10,7 @@ specific outcome through the LIVE pipeline (OCR → DeepSeek → deterministic e
 
 The documents are drawn to look like genuine Indian hospital/clinic paperwork — letterhead
 with address + GSTIN, an itemised table, a totals box, a round "PAID" stamp and a signature
-line — while staying crisp enough for Tesseract. Form values match each document's content
+line — while staying crisp enough for the vision model to read. Form values match each document's content
 (patient, amount, date) so the claim/document consistency checks pass.
 
 Output:

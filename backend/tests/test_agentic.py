@@ -81,7 +81,7 @@ def test_build_review_prompt() -> None:
 async def test_agent_skipped_when_disabled(monkeypatch) -> None:
     # default: enable_agentic_review is False → never runs (even with a key / live mode)
     monkeypatch.setenv("ENABLE_AGENTIC_REVIEW", "false")
-    monkeypatch.setenv("DEEPSEEK_API_KEY", "test-key")
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     get_settings.cache_clear()
     try:
         out = await _maybe_run_agentic_review(_claim(mode="live"), None, [])
@@ -94,7 +94,7 @@ async def test_agent_runs_for_eval_when_enabled(monkeypatch) -> None:
     # enabled + an LLM configured → the agent ALSO runs for an EVAL (demo) claim, so demo
     # scenarios and uploads drive the identical pipeline incl. the agentic node.
     monkeypatch.setenv("ENABLE_AGENTIC_REVIEW", "true")
-    monkeypatch.setenv("DEEPSEEK_API_KEY", "test-key")
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     get_settings.cache_clear()
 
     seen: dict = {}
@@ -115,7 +115,7 @@ async def test_agent_runs_for_eval_when_enabled(monkeypatch) -> None:
 async def test_agent_runs_for_live_when_enabled(monkeypatch) -> None:
     # enabled + LLM key + LIVE claim → the agent runs and returns its assessment
     monkeypatch.setenv("ENABLE_AGENTIC_REVIEW", "true")
-    monkeypatch.setenv("DEEPSEEK_API_KEY", "test-key")
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     get_settings.cache_clear()
 
     seen: dict = {}
@@ -139,7 +139,7 @@ async def test_stream_emits_ai_assessment_after_result(monkeypatch) -> None:
     """The decision streams first; the AI assessment arrives LATER as a separate event,
     proving the agent is non-blocking (off the critical path)."""
     monkeypatch.setenv("ENABLE_AGENTIC_REVIEW", "true")
-    monkeypatch.setenv("DEEPSEEK_API_KEY", "test-key")
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     get_settings.cache_clear()
 
     async def fake_run(claim, view, documents_provided=None, *, decision=None):  # type: ignore[no-untyped-def]
@@ -163,7 +163,7 @@ async def test_stream_emits_ai_assessment_for_eval(monkeypatch) -> None:
     """Parity with the upload path: an EVAL (demo) claim ALSO streams an ai_assessment AFTER
     the decision when the agent is enabled — proving demo and upload run the same pipeline."""
     monkeypatch.setenv("ENABLE_AGENTIC_REVIEW", "true")
-    monkeypatch.setenv("DEEPSEEK_API_KEY", "test-key")
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     get_settings.cache_clear()
 
     async def fake_run(claim, view, documents_provided=None, *, decision=None):  # type: ignore[no-untyped-def]

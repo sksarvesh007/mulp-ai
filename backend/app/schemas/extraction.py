@@ -1,4 +1,4 @@
-"""Extraction contracts — produced identically by the eval and live (Gemini)
+"""Extraction contracts — produced identically by the eval and live (gpt-5.5 vision)
 backends so every downstream node is byte-for-byte agnostic to the perception layer."""
 
 from __future__ import annotations

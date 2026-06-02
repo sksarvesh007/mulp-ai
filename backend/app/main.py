@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import time
+import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
 
-import structlog
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,9 +15,10 @@ from fastapi.responses import JSONResponse
 
 from app.api.routes import router
 from app.core.config import get_settings
+from app.observability import logs
 from app.observability.setup import setup_observability
 
-log = structlog.get_logger()
+log = logs.get_logger("app.request")
 
 
 def _error(status: int, error: str, detail: Any) -> JSONResponse:
@@ -51,6 +53,43 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    @app.middleware("http")
+    async def _log_requests(request: Request, call_next: Any) -> Any:
+        """Tag every request with a short ``request_id`` (bound onto all logs emitted while
+        handling it) and log its lifecycle with status + latency. Health checks are skipped
+        to keep the log clean. Errors are re-raised to the exception handler below."""
+        request_id = uuid.uuid4().hex[:12]
+        logs.bind(request_id=request_id)
+        quiet = request.url.path == "/healthz"
+        start = time.perf_counter()
+        if not quiet:
+            log.info("request.start", method=request.method, path=request.url.path)
+        try:
+            response = await call_next(request)
+        except Exception as exc:
+            log.error(
+                "request.error",
+                method=request.method,
+                path=request.url.path,
+                error=str(exc),
+                error_type=type(exc).__name__,
+                elapsed_ms=round((time.perf_counter() - start) * 1000, 1),
+                exc_info=True,
+            )
+            raise
+        finally:
+            logs.clear()
+        if not quiet:
+            log.info(
+                "request.done",
+                method=request.method,
+                path=request.url.path,
+                status_code=response.status_code,
+                elapsed_ms=round((time.perf_counter() - start) * 1000, 1),
+            )
+        response.headers["X-Request-ID"] = request_id
+        return response
 
     @app.exception_handler(RequestValidationError)
     async def _on_validation_error(_request: Request, exc: RequestValidationError) -> JSONResponse:

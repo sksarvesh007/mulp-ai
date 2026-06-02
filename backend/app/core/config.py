@@ -22,21 +22,19 @@ class Settings(BaseSettings):
     )
 
     # ── LLM / vision provider ────────────────────────────────────────────────
-    llm_provider: str = "deepseek"  # "deepseek" (text) | "gemini" (vision)
+    llm_provider: str = "openai"  # "openai" — multimodal base model reads images directly
 
-    # DeepSeek (text-only, OpenAI-compatible)
-    deepseek_api_key: str = ""
-    deepseek_base_url: str = "https://api.lkeap.cloud.tencent.com/v1"
-    deepseek_model: str = "deepseek-v3-0324"
-
-    # Gemini (multimodal)
-    google_api_key: str = ""
-    gemini_model: str = "gemini-2.5-flash"
+    # OpenAI (multimodal). The base model (gpt-5.5) reads document images directly, so the
+    # live pipeline has no OCR step — the upload is sent straight to the model as an image.
+    openai_api_key: str = ""
+    openai_base_url: str = "https://api.openai.com/v1"
+    openai_model: str = "gpt-5.5"
 
     # Per-request LLM timeout (seconds) + retries. Without this the OpenAI SDK default is
-    # ~10 minutes, so a slow/stuck DeepSeek call can hang a node (and the SSE stream) for
-    # minutes; bounding it lets a stuck call fail fast and degrade into a clean decision.
-    llm_timeout_s: float = 45.0
+    # ~10 minutes, so a slow/stuck call can hang a node (and the SSE stream) for minutes;
+    # bounding it lets a stuck call fail fast and degrade into a clean decision. Vision +
+    # reasoning is slower than text, so give it more headroom than the old text-only path.
+    llm_timeout_s: float = 90.0
     llm_max_retries: int = 2
 
     # ── App ──────────────────────────────────────────────────────────────────
@@ -92,14 +90,12 @@ class Settings(BaseSettings):
 
     @property
     def has_llm(self) -> bool:
-        if self.llm_provider == "gemini":
-            return bool(self.google_api_key)
-        return bool(self.deepseek_api_key)
+        return bool(self.openai_api_key)
 
     @property
     def supports_vision(self) -> bool:
-        """Only the Gemini provider can read document images directly."""
-        return self.llm_provider == "gemini" and bool(self.google_api_key)
+        """The OpenAI base model reads document images directly (no OCR step)."""
+        return bool(self.openai_api_key)
 
 
 @lru_cache

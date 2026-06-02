@@ -1,12 +1,16 @@
 """Live perception backend.
 
-Two providers, both behind the same ``Extractor`` interface:
-  - **gemini** (multimodal): reads document images directly (when a key is set).
-  - **deepseek** (text-only): OCRs the image with Tesseract, then structures the text.
+A single multimodal provider behind the ``Extractor`` interface: the OpenAI base model
+(``gpt-5.5``) **reads document images directly** — the uploaded image (or each rendered
+PDF page) is sent straight to the model, so there is no OCR step.
+
+One vision call per document does **both** jobs at once: it classifies the document (its
+type / relevance) and extracts the key fields. ``classify()`` and ``extract()`` both read
+from that single cached call, so an uploaded document is perceived exactly once.
 
 When a document already carries structured ``content`` (e.g. an API caller passes
 parsed fields), we trust it — so the live backend is usable and testable without a
-network round-trip. All network/OCR calls degrade gracefully (return ok=False) and
+network round-trip. All network/image calls degrade gracefully (return ok=False) and
 are guarded by the resilient node wrapper as well.
 """
 
@@ -16,32 +20,41 @@ from typing import Any
 
 from app.core.config import Settings, get_settings
 from app.extraction.eval_extractor import _coerce
-from app.llm.deepseek import deepseek_json
+from app.llm.openai_client import openai_vision_json
+from app.observability.logs import get_logger
 from app.schemas.claim import DocumentInput
 from app.schemas.enums import DocumentQuality, DocumentType
 from app.schemas.extraction import ExtractedDocument
 
-_CLASSIFY_PROMPT = (
-    "You are a medical-document classifier. Classify by the document's FORMAT, not its medical "
-    "specialty. Rules: a document with itemized charges and a total amount is a BILL — "
-    "HOSPITAL_BILL for a clinic/hospital/dental/eye clinic, PHARMACY_BILL only for a pharmacy/"
-    "chemist. A PRESCRIPTION states a diagnosis and medicines (Rx). LAB_REPORT / "
-    "DIAGNOSTIC_REPORT / DENTAL_REPORT contain test results or clinical findings WITHOUT charges. "
-    'Reply with ONLY a JSON object: {{"doc_type": one of '
-    "[PRESCRIPTION, HOSPITAL_BILL, LAB_REPORT, PHARMACY_BILL, DIAGNOSTIC_REPORT, DENTAL_REPORT, "
-    'DISCHARGE_SUMMARY, UNKNOWN], "patient_name": string|null}}.\n\nDOCUMENT TEXT:\n{text}'
+log = get_logger("app.extraction")
+
+# One prompt that does classification (document type / relevance) AND field extraction in a
+# single vision call, so we never round-trip the same image twice.
+_PERCEIVE_PROMPT = (
+    "You are processing an uploaded Indian medical-claim document. Read the attached image and "
+    "do BOTH of the following in one pass:\n"
+    "(1) CLASSIFY it by FORMAT, not medical specialty: a document with itemized charges and a "
+    "total amount is a BILL — HOSPITAL_BILL for a clinic/hospital/dental/eye clinic, PHARMACY_BILL "
+    "only for a pharmacy/chemist; a PRESCRIPTION states a diagnosis and medicines (Rx); LAB_REPORT "
+    "/ DIAGNOSTIC_REPORT / DENTAL_REPORT contain test results or clinical findings WITHOUT charges. "
+    "If the image is not a medical-claim document at all, use UNKNOWN.\n"
+    "(2) EXTRACT the key details.\n"
+    "Reply with ONLY a JSON object with keys: doc_type (one of [PRESCRIPTION, HOSPITAL_BILL, "
+    "LAB_REPORT, PHARMACY_BILL, DIAGNOSTIC_REPORT, DENTAL_REPORT, DISCHARGE_SUMMARY, UNKNOWN]), "
+    "patient_name, doctor_name, doctor_registration, date, diagnosis, treatment, hospital_name, "
+    "medicines (list), tests_ordered (list), line_items (list of {description, amount}), total "
+    "(number). Use null/empty when unknown. Be faithful; do not invent amounts."
 )
-_EXTRACT_PROMPT = (
-    "Extract structured fields from this Indian medical document text. Reply with ONLY a JSON "
-    "object with keys: patient_name, doctor_name, doctor_registration, date, diagnosis, treatment, "
-    "hospital_name, medicines (list), tests_ordered (list), line_items (list of "
-    "{{description, amount}}), total (number). Use null/empty when unknown. Be faithful; do not "
-    "invent amounts.\n\nDOCUMENT TEXT:\n{text}"
-)
+
+
+def _parse_doc_type(value: Any) -> DocumentType | None:
+    """Coerce a model-returned doc_type string onto the enum (None if unrecognised)."""
+    raw = str(value or "").strip().upper().replace(" ", "_").replace("-", "_")
+    return DocumentType(raw) if raw in DocumentType.__members__ else None
 
 
 def _guess_doc_type(file_name: str | None, text: str = "") -> DocumentType:
-    """Best-effort document type from filename + OCR-text keywords (classifier fallback)."""
+    """Best-effort document type from filename keywords (classifier fallback)."""
     hay = f"{file_name or ''} {text}".lower()
     if "pharmacy" in hay or "drug lic" in hay:
         return DocumentType.PHARMACY_BILL
@@ -61,10 +74,13 @@ class LiveExtractor:
 
     def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
-        # OCR is the slow step and ``classify()`` + ``extract()`` both need the same text
-        # for a given document. Cache the OCR result per ``image_ref`` so each uploaded
-        # document is read exactly once per extractor instance (one pass, not two).
-        self._ocr_cache: dict[str, str] = {}
+        # ``classify()`` + ``extract()`` both need the same document image(s). Encoding/
+        # rasterizing is the slow local step, so cache the base64 image list per ``image_ref``
+        # — each uploaded document is loaded exactly once per extractor instance.
+        self._image_cache: dict[str, list[str]] = {}
+        # The single combined vision call's result, cached per ``image_ref`` so classify() and
+        # extract() share ONE round-trip — each uploaded document is perceived exactly once.
+        self._perception_cache: dict[str, tuple[str, dict[str, Any]]] = {}
 
     # ── public interface ─────────────────────────────────────────────────────
     async def classify(self, doc: DocumentInput) -> ExtractedDocument:
@@ -103,108 +119,104 @@ class LiveExtractor:
             source=self.source,
         )
 
-    # ── network / OCR (exercised only in live runs) ──────────────────────────
-    def _ocr(self, image_ref: str) -> str:  # pragma: no cover - requires file + tesseract
+    # ── image loading (exercised only in live runs) ──────────────────────────
+    def _load_images(self, image_ref: str) -> list[str]:  # pragma: no cover - requires a file
+        """Load a document into base64 data URLs for the vision model. Image files become one
+        data URL; PDFs are rasterized one data URL per page (so scanned/image PDFs read too)."""
         from pathlib import Path
 
         path = Path(image_ref)
         if path.suffix.lower() == ".pdf":
-            from pypdf import PdfReader
+            import pypdfium2 as pdfium
 
-            text = "\n".join(page.extract_text() or "" for page in PdfReader(str(path)).pages)
-            if len(text.strip()) >= 40:  # real text layer (digital PDF) → use it (fast path)
-                return text
-            # No/!thin text layer → it's a scanned or image-only PDF. Render each page to an
-            # image and OCR it, so images embedded in the PDF are read too.
-            return self._ocr_pdf_pages(path) or text
+            pdf = pdfium.PdfDocument(str(path))
+            try:
+                return [self._encode(pdf[i].render(scale=2).to_pil()) for i in range(len(pdf))]
+            finally:
+                pdf.close()
 
         from PIL import Image
 
-        return self._ocr_image(Image.open(path))
+        return [self._encode(Image.open(path))]
 
-    def _ocr_image(self, original: Any) -> str:  # pragma: no cover - requires tesseract
-        """Tesseract on a PIL image, with an enhance/upscale retry for low-yield photos."""
-        from PIL import ImageOps
-
-        text = self._tesseract(original)
-        if len(text.strip()) >= 40:  # clean document — direct read is best
-            return text
-        # Low yield (phone photo / low contrast) → grayscale → autocontrast → upscale small images.
-        enhanced = ImageOps.autocontrast(original.convert("L"))
-        longest = max(enhanced.size)
-        if longest < 1600:
-            scale = 1600 / longest
-            enhanced = enhanced.resize((round(enhanced.width * scale), round(enhanced.height * scale)))
-        return self._tesseract(enhanced)
-
-    def _ocr_pdf_pages(self, path: Any) -> str:  # pragma: no cover - requires pdfium + tesseract
-        """Rasterize each PDF page (pypdfium2, ~216 DPI) and OCR it — for scanned/image PDFs."""
-        import pypdfium2 as pdfium
-
-        pdf = pdfium.PdfDocument(str(path))
-        try:
-            pages = [self._ocr_image(pdf[i].render(scale=3).to_pil()) for i in range(len(pdf))]
-        finally:
-            pdf.close()
-        return "\n".join(pages)
-
-    def _tesseract(self, img: Any) -> str:  # pragma: no cover - requires tesseract
+    def _encode(self, img: Any) -> str:  # pragma: no cover - requires PIL
+        """A PIL image → a base64 JPEG data URL, downscaled so the upload payload stays sane."""
+        import base64
         import io
-        import subprocess
 
+        img = img.convert("RGB")
+        longest = max(img.size)
+        if longest > 2000:  # cap the longest side — keeps the request small without losing legibility
+            scale = 2000 / longest
+            img = img.resize((round(img.width * scale), round(img.height * scale)))
         buf = io.BytesIO()
-        img.save(buf, format="PNG")
-        proc = subprocess.run(
-            ["tesseract", "stdin", "stdout", "--psm", "6"],
-            input=buf.getvalue(),
-            capture_output=True,
-            timeout=60,
-        )
-        return proc.stdout.decode("utf-8", errors="ignore")
+        img.save(buf, format="JPEG", quality=85)
+        return "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode()
 
-    def _safe_ocr(self, image_ref: str | None) -> str:  # pragma: no cover
+    def _safe_images(self, image_ref: str | None) -> list[str]:  # pragma: no cover
         if not image_ref:
-            return ""
-        if image_ref in self._ocr_cache:  # reuse the single OCR pass across classify + extract
-            return self._ocr_cache[image_ref]
+            return []
+        if image_ref in self._image_cache:  # reuse the single load across classify + extract
+            return self._image_cache[image_ref]
         try:
-            text = self._ocr(image_ref)
+            images = self._load_images(image_ref)
         except Exception:
-            text = ""
-        self._ocr_cache[image_ref] = text
-        return text
+            images = []
+        self._image_cache[image_ref] = images
+        return images
+
+    async def _perceive(self, doc: DocumentInput) -> tuple[str, dict[str, Any]]:  # pragma: no cover
+        """One combined vision call (classify + extract), cached per ``image_ref`` so classify()
+        and extract() share it. Returns ``(status, data)`` where status is:
+          - ``"unreadable"`` — no image could be loaded (nothing to send the model)
+          - ``"error"``      — image(s) sent but the model call failed
+          - ``"ok"``         — ``data`` holds the parsed doc_type + extracted fields
+        """
+        ref = doc.image_ref
+        if ref and ref in self._perception_cache:  # the single round-trip, reused
+            log.debug("perceive.cache_hit", file_id=doc.file_id)
+            return self._perception_cache[ref]
+        images = self._safe_images(ref)
+        if not images:
+            out: tuple[str, dict[str, Any]] = ("unreadable", {})
+        else:
+            try:
+                out = ("ok", await openai_vision_json(_PERCEIVE_PROMPT, images, self.settings))
+            except Exception:
+                out = ("error", {})
+        log.info(
+            "perceive",
+            file_id=doc.file_id,
+            file_name=doc.file_name,
+            images=len(images),
+            status=out[0],
+            doc_type=out[1].get("doc_type"),
+        )
+        if ref:
+            self._perception_cache[ref] = out
+        return out
 
     async def _llm_classify(self, doc: DocumentInput) -> ExtractedDocument:  # pragma: no cover
-        text = self._safe_ocr(doc.image_ref)
-        dt = DocumentType.UNKNOWN
-        patient = None
-        if text.strip():
-            try:
-                data = await deepseek_json(_CLASSIFY_PROMPT.format(text=text[:6000]), self.settings)
-                raw = str(data.get("doc_type", "")).strip().upper().replace(" ", "_").replace("-", "_")
-                if raw in DocumentType.__members__:
-                    dt = DocumentType(raw)
-                patient = data.get("patient_name")
-            except Exception:
-                pass
-        if dt == DocumentType.UNKNOWN:  # filename + OCR-text fallback (never fails)
-            dt = _guess_doc_type(doc.file_name, text)
+        status, data = await self._perceive(doc)
+        # vision-read type, else a filename fallback (never fails)
+        dt = _parse_doc_type(data.get("doc_type")) or _guess_doc_type(doc.file_name)
         return ExtractedDocument(
             file_id=doc.file_id,
             doc_type=dt,
-            patient_name=patient,
-            quality=DocumentQuality.UNREADABLE if not text.strip() else DocumentQuality.GOOD,
+            patient_name=data.get("patient_name"),
+            quality=DocumentQuality.UNREADABLE if status == "unreadable" else DocumentQuality.GOOD,
             confidence=0.75,
             source=self.source,
         )
 
     async def _llm_extract(self, doc: DocumentInput) -> ExtractedDocument:  # pragma: no cover
-        text = self._safe_ocr(doc.image_ref)
-        # Carry a real document type onto the extracted doc (filename + OCR-text fallback), so
-        # downstream consumers — the claim/document consistency check, the advisory agent, the UI —
-        # see "hospital bill" / "prescription" rather than UNKNOWN in live runs.
-        dt = doc.actual_type or _guess_doc_type(doc.file_name, text)
-        if not text.strip():
+        status, data = await self._perceive(doc)
+        # Carry a real document type onto the extracted doc so downstream consumers — the
+        # claim/document consistency check, the advisory agent, the UI — see "hospital bill" /
+        # "prescription" rather than UNKNOWN in live runs. The vision model reads the type off
+        # the image itself; the filename is only the last-resort fallback.
+        dt = doc.actual_type or _parse_doc_type(data.get("doc_type")) or _guess_doc_type(doc.file_name)
+        if status == "unreadable":
             return ExtractedDocument(
                 file_id=doc.file_id,
                 doc_type=dt,
@@ -214,18 +226,7 @@ class LiveExtractor:
                 notes=["UNREADABLE"],
                 source=self.source,
             )
-        try:
-            data = await deepseek_json(_EXTRACT_PROMPT.format(text=text[:8000]), self.settings)
-            return ExtractedDocument(
-                file_id=doc.file_id,
-                doc_type=dt,
-                quality=DocumentQuality.GOOD,
-                confidence=0.7,
-                ok=True,
-                source=self.source,
-                **_coerce(data),
-            )
-        except Exception:
+        if status == "error":
             return ExtractedDocument(
                 file_id=doc.file_id,
                 doc_type=dt,
@@ -234,3 +235,12 @@ class LiveExtractor:
                 notes=["Automated extraction was unavailable for this document."],
                 source=self.source,
             )
+        return ExtractedDocument(
+            file_id=doc.file_id,
+            doc_type=dt,
+            quality=DocumentQuality.GOOD,
+            confidence=0.7,
+            ok=True,
+            source=self.source,
+            **_coerce(data),
+        )

@@ -41,8 +41,8 @@ ClaimResult(claim_id, decision: ClaimDecision, trace: [TraceEvent])
 - **In:** `classify(DocumentInput)`, `extract(DocumentInput)` (both async).
 - **Out:** `ExtractedDocument` (classify populates type/quality/patient; extract fills fields).
 - **Errors:** never raises for bad content — returns `ok=False` / low confidence so the
-  pipeline degrades. `EvalExtractor` trusts provided `content`; `LiveExtractor` uses
-  DeepSeek (text+OCR) or Gemini (vision), falling back to `content` when present.
+  pipeline degrades. `EvalExtractor` trusts provided `content`; `LiveExtractor` sends the
+  document image to gpt-5.5 (vision — no OCR), falling back to `content` when present.
 
 ## DocumentVerificationGate — `app/engine/gate.py::verify_documents`
 - **In:** `(ClaimInput, [ExtractedDocument] (classified), PolicyRepository)`.
