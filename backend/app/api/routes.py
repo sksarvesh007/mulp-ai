@@ -28,6 +28,7 @@ from fastapi.responses import StreamingResponse
 from app.db.repository import store
 from app.graph import resume_claim, run_claim, run_claim_hitl, stream_claim
 from app.observability.datasets import save_review
+from app.schemas.analytics import Analytics
 from app.schemas.claim import ClaimInput, DocumentInput
 from app.schemas.decision import ClaimResult, HumanReviewVerdict
 from app.schemas.enums import ClaimStatus
@@ -116,6 +117,12 @@ async def resume_review(claim_id: str, verdict: HumanReviewVerdict) -> ClaimResu
 @router.get("/claims")
 async def list_claims() -> list[dict[str, Any]]:
     return store.list()
+
+
+@router.get("/analytics", response_model=Analytics)
+async def analytics() -> Analytics:
+    """Aggregate metrics over every persisted claim, for the UI's Analytics dashboard."""
+    return Analytics(**store.analytics())
 
 
 @router.get("/claims/{claim_id}", response_model=ClaimResult)

@@ -186,6 +186,46 @@ export interface UploadSample {
   seed?: { member_id: string; treatment_date: string; count: number };
 }
 
+// ── Analytics dashboard (GET /analytics) ──────────────────────────────────────
+export interface AnalyticsNameValue {
+  name: string;
+  value: number;
+}
+export interface AnalyticsCategoryStat {
+  category: string;
+  approved: number;
+  partial: number;
+  rejected: number;
+  review: number;
+  action: number;
+  total: number;
+}
+export interface AnalyticsTimePoint {
+  date: string; // YYYY-MM-DD (IST)
+  claims: number;
+  approved_amount: number;
+}
+export interface AnalyticsBucket {
+  bucket: string;
+  count: number;
+}
+export interface Analytics {
+  total_claims: number;
+  approved: number;
+  partial: number;
+  rejected: number;
+  review: number;
+  action: number;
+  approval_rate: number; // 0..1
+  total_approved_amount: number;
+  avg_confidence: number | null;
+  degraded_count: number;
+  by_decision: AnalyticsNameValue[];
+  by_category: AnalyticsCategoryStat[];
+  over_time: AnalyticsTimePoint[];
+  confidence_buckets: AnalyticsBucket[];
+}
+
 export type StreamEvent =
   | { type: "progress"; event: string; node?: string; error?: string; file_id?: string }
   | { type: "node"; node: string }

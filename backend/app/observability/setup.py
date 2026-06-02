@@ -13,12 +13,21 @@ them. Structured logging (structlog) is always configured.
 from __future__ import annotations
 
 import logging
+from collections.abc import MutableMapping
+from datetime import datetime
 from typing import Any
 
 import structlog
 from fastapi import FastAPI
 
+from app.core.clock import IST
 from app.core.config import Settings
+
+
+def _ist_timestamp(_logger: Any, _name: str, event_dict: MutableMapping[str, Any]) -> MutableMapping[str, Any]:
+    """Stamp each log line with the current IST time (independent of the server's tz)."""
+    event_dict["timestamp"] = datetime.now(IST).isoformat(timespec="milliseconds")
+    return event_dict
 
 
 def setup_logging(level: str = "INFO", *, json_logs: bool = True) -> None:
@@ -37,7 +46,7 @@ def setup_logging(level: str = "INFO", *, json_logs: bool = True) -> None:
         processors=[
             structlog.contextvars.merge_contextvars,
             structlog.processors.add_log_level,
-            structlog.processors.TimeStamper(fmt="iso"),
+            _ist_timestamp,
             structlog.processors.StackInfoRenderer(),
             structlog.processors.format_exc_info,
             renderer,

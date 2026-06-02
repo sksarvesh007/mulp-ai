@@ -3,6 +3,7 @@ restarts and power the ops history view. Swappable backend via ``settings.db_url
 
 from __future__ import annotations
 
+from collections import Counter, defaultdict
 from functools import lru_cache
 from typing import Any
 
@@ -10,6 +11,7 @@ from sqlalchemy import String, inspect, text
 from sqlmodel import Session, SQLModel, create_engine, select
 from sqlmodel.sql.sqltypes import AutoString
 
+from app.core.clock import to_ist
 from app.core.config import get_settings
 from app.db.models import ClaimRecord
 from app.observability.logs import get_logger
@@ -17,6 +19,17 @@ from app.schemas.claim import ClaimInput
 from app.schemas.decision import ClaimResult
 
 log = get_logger("app.store")
+
+# A claim's decision/status collapses to one of five display segments for the dashboard.
+_DECISION_SEGMENT = {"APPROVED": "approved", "PARTIAL": "partial", "REJECTED": "rejected", "MANUAL_REVIEW": "review"}
+_CONFIDENCE_BUCKETS = ["0–20%", "20–40%", "40–60%", "60–80%", "80–100%"]
+
+
+def _segment(decision: str | None, status: str) -> str:
+    """Map a (decision, status) pair onto exactly one dashboard segment."""
+    if decision in _DECISION_SEGMENT:
+        return _DECISION_SEGMENT[decision]
+    return "review" if status == "PENDING_REVIEW" else "action"  # None decision: awaiting human / member
 
 
 class ClaimRepository:
@@ -109,6 +122,65 @@ class ClaimRepository:
             }
             for r in records
         ]
+
+
+    def analytics(self) -> dict[str, Any]:
+        """Aggregate every persisted claim into the dashboard payload (counts, money,
+        per-category mix, a daily time series and a confidence histogram). Time grouping is
+        by IST calendar day. Pure read; safe on any SQL backend."""
+        with Session(self.engine) as session:
+            records = session.exec(select(ClaimRecord)).all()
+
+        seg_counts: Counter[str] = Counter()
+        by_cat: dict[str, Counter[str]] = defaultdict(Counter)
+        by_day: dict[str, dict[str, int]] = defaultdict(lambda: {"claims": 0, "approved_amount": 0})
+        conf_buckets = [0, 0, 0, 0, 0]
+        confidences: list[float] = []
+        total_approved = 0
+        degraded = 0
+
+        for r in records:
+            seg = _segment(r.decision, r.status)
+            seg_counts[seg] += 1
+            cat = r.category or "UNKNOWN"
+            by_cat[cat][seg] += 1
+            by_cat[cat]["total"] += 1
+            total_approved += r.approved_amount or 0
+            if r.degraded:
+                degraded += 1
+            if r.confidence is not None:
+                confidences.append(r.confidence)
+                idx = min(4, max(0, int(r.confidence * 5)))  # 0.0–1.0 → bucket 0–4 (1.0 → top bucket)
+                conf_buckets[idx] += 1
+            if r.created_at is not None:
+                day = to_ist(r.created_at).date().isoformat()
+                by_day[day]["claims"] += 1
+                by_day[day]["approved_amount"] += r.approved_amount or 0
+
+        approved, partial, rejected = seg_counts["approved"], seg_counts["partial"], seg_counts["rejected"]
+        rate_denom = approved + partial + rejected
+        segments = ("approved", "partial", "rejected", "review", "action")
+        labels = [("approved", "Approved"), ("partial", "Partial"), ("rejected", "Rejected"),
+                  ("review", "In review"), ("action", "Action needed")]
+        return {
+            "total_claims": len(records),
+            "approved": approved,
+            "partial": partial,
+            "rejected": rejected,
+            "review": seg_counts["review"],
+            "action": seg_counts["action"],
+            "approval_rate": round((approved + partial) / rate_denom, 4) if rate_denom else 0.0,
+            "total_approved_amount": total_approved,
+            "avg_confidence": round(sum(confidences) / len(confidences), 4) if confidences else None,
+            "degraded_count": degraded,
+            "by_decision": [{"name": label, "value": seg_counts[key]} for key, label in labels if seg_counts[key]],
+            "by_category": [
+                {"category": cat, "total": c["total"], **{s: c[s] for s in segments}}
+                for cat, c in sorted(by_cat.items(), key=lambda kv: -kv[1]["total"])
+            ],
+            "over_time": [{"date": d, **by_day[d]} for d in sorted(by_day)],
+            "confidence_buckets": [{"bucket": b, "count": conf_buckets[i]} for i, b in enumerate(_CONFIDENCE_BUCKETS)],
+        }
 
 
 @lru_cache

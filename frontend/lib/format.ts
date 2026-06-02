@@ -86,5 +86,13 @@ export function fmtDate(iso: string): string {
     month: "short",
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: "Asia/Kolkata", // always show IST regardless of the viewer's locale
   });
+}
+
+/** A short IST day label (e.g. "3 Jun") for chart axes, from a YYYY-MM-DD string. */
+export function fmtDay(ymd: string): string {
+  const d = new Date(`${ymd}T00:00:00+05:30`);
+  if (Number.isNaN(d.getTime())) return ymd;
+  return d.toLocaleString("en-IN", { day: "numeric", month: "short", timeZone: "Asia/Kolkata" });
 }

@@ -1,4 +1,5 @@
 import type {
+  Analytics,
   ClaimResult,
   ClaimSummary,
   HumanReviewVerdict,
@@ -146,6 +147,8 @@ export async function seedHistory(seed: {
 }
 export const getClaims = () => getJSON<ClaimSummary[]>("/claims");
 export const getClaim = (id: string) => getJSON<ClaimResult>(`/claims/${id}`);
+// Aggregate dashboard metrics. Wake-and-retry since a cold free-tier backend 502s on first hit.
+export const getAnalytics = () => withWakeRetry(() => getJSON<Analytics>("/analytics"));
 
 export async function submitClaim(payload: Record<string, unknown>): Promise<ClaimResult> {
   const res = await fetch(`${API_URL}/claims`, {

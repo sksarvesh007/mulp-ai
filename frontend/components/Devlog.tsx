@@ -81,17 +81,6 @@ export function Devlog() {
                 <ol className="space-y-3">
                   <li className="flex gap-2.5">
                     <span className="mt-px shrink-0 text-xs font-medium text-brand">01</span>
-                    <p>
-                      <span className="text-ink">The LLM provider can be a bit unreliable.</span> Not the
-                      extraction itself, which is solid - it is the provider&apos;s platform (availability
-                      and rate limits) that is not the most stable. I tried the free tiers from Groq and
-                      Gemini, but the limits ran out fast, so I am currently on a provider I happened to
-                      find in a year-old GitHub repo. It does the job, but it is the least stable piece of
-                      the stack.
-                    </p>
-                  </li>
-                  <li className="flex gap-2.5">
-                    <span className="mt-px shrink-0 text-xs font-medium text-brand">02</span>
                     <div className="space-y-2">
                       <p>
                         <span className="text-ink">All the human-review feedback is captured as
@@ -115,28 +104,20 @@ export function Devlog() {
                     </div>
                   </li>
                   <li className="flex gap-2.5">
+                    <span className="mt-px shrink-0 text-xs font-medium text-brand">02</span>
+                    <p>
+                      <span className="text-ink">The document-upload pipeline can take a few seconds,</span>{" "}
+                      since vision + reasoning runs per document. If a run ever stalls, a hard refresh and
+                      retry will pick up cleanly.
+                    </p>
+                  </li>
+                  <li className="flex gap-2.5">
                     <span className="mt-px shrink-0 text-xs font-medium text-brand">03</span>
-                    <p>
-                      <span className="text-ink">The intake + document-upload pipeline can be slow,</span>{" "}
-                      and once in a while it stalls mid-run. If that happens, do a hard refresh and try
-                      again. Same root cause: that flaky LLM provider.
-                    </p>
-                  </li>
-                  <li className="flex gap-2.5">
-                    <span className="mt-px shrink-0 text-xs font-medium text-brand">04</span>
-                    <p>
-                      <span className="text-ink">OCR is a plain (Tesseract) model for now,</span> purely
-                      because of hardware limits. With better compute I would swap in a vision-language
-                      model (VLM) for much stronger reading of messy, real-world documents.
-                    </p>
-                  </li>
-                  <li className="flex gap-2.5">
-                    <span className="mt-px shrink-0 text-xs font-medium text-brand">05</span>
                     <p>
                       <span className="text-ink">
                         There might be one or two minor differences in the pipeline run to run
                       </span>{" "}
-                      (atleast not a deterministic pipeline though).
+                      (the perception step is a live model, so it is not perfectly deterministic, we dont even want a deterministic pipeline haha).
                     </p>
                   </li>
                 </ol>
@@ -150,20 +131,13 @@ export function Devlog() {
                   <li className="flex gap-2.5">
                     <span className="mt-px shrink-0 text-xs font-medium text-brand">01</span>
                     <p>
-                      <span className="text-ink">Integrate a VLM</span> for document understanding,
-                      replacing the OCR + text-LLM extraction path.
-                    </p>
-                  </li>
-                  <li className="flex gap-2.5">
-                    <span className="mt-px shrink-0 text-xs font-medium text-brand">02</span>
-                    <p>
                       <span className="text-ink">A hill-climbing loop</span> that uses the human-in-the-loop
                       verdicts together with the Langfuse feedback dataset to iteratively improve the AI
                       system (run evals over the collected data, then refine prompts and matching).
                     </p>
                   </li>
                   <li className="flex gap-2.5">
-                    <span className="mt-px shrink-0 text-xs font-medium text-brand">03</span>
+                    <span className="mt-px shrink-0 text-xs font-medium text-brand">02</span>
                     <p>
                       <span className="text-ink">Drive down latency</span> across the pipeline.
                     </p>
