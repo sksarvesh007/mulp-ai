@@ -1,0 +1,90 @@
+[project]
+name = "claims-backend"
+version = "0.1.0"
+description = "Plum health-insurance claims processing — FastAPI + LangGraph backend"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.6",
+    "langgraph>=0.2.50",
+    "langchain-core>=0.3",
+    "langchain-google-genai>=2.0",
+    "tenacity>=9.0",
+    "python-multipart>=0.0.12",
+    "httpx>=0.27",
+    "structlog>=24.4",
+    "pypdf>=5.1",
+    "openai>=1.50",
+    "pillow>=11.0",
+    "pytesseract>=0.3.13",
+    "sqlmodel>=0.0.22",
+    "openai-agents>=0.17.4",
+    "pypdfium2>=5.8.0",
+]
+
+[dependency-groups]
+# Observability stack kept separate so the core engine + eval can install/run without it.
+observability = [
+    "langfuse>=3.0",
+    "opentelemetry-sdk>=1.29",
+    "opentelemetry-exporter-otlp>=1.29",
+    "opentelemetry-instrumentation-fastapi>=0.50b0",
+    "openinference-instrumentation-openai-agents>=0.1",
+]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=6.0",
+    "ruff>=0.8",
+    "mypy>=1.13",
+]
+
+[tool.uv]
+package = false
+# observability (langfuse + otel) is always installed so the server can trace;
+# tests still run without it (tracing is guarded + pragma-excluded).
+default-groups = ["dev", "observability"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "--cov=app --cov-report=term-missing --cov-report=html --cov-branch --cov-fail-under=100"
+
+[tool.coverage.run]
+source = ["app"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "\\.\\.\\.",
+    "if __name__ == .__main__.:",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "ASYNC"]
+
+[tool.ruff.lint.per-file-ignores]
+# FastAPI uses callables (File/Form/Depends) as argument defaults by design.
+"app/api/routes.py" = ["B008"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+ignore_missing_imports = true
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+# JSON config adapter: dynamic dict access is inherent; method names document return types.
+module = "app.policy.repository"
+disable_error_code = ["no-any-return"]

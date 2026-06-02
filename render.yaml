@@ -1,0 +1,58 @@
+# Render Blueprint — deploys the full stack as two Docker web services.
+# In the Render dashboard: New → Blueprint → pick this repo, then set the one secret
+# (DEEPSEEK_API_KEY) on the backend service. Everything else is wired automatically.
+services:
+  # ── FastAPI + LangGraph backend ────────────────────────────────────────────
+  - type: web
+    name: mulp-claims-backend
+    runtime: docker
+    plan: free # bump to "starter" if you hit RAM limits or want no cold-starts
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: . # root context: the image also copies docs/ (policy + test data)
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: LLM_PROVIDER
+        value: deepseek
+      - key: DEEPSEEK_API_KEY
+        sync: false # ← set this in the Render dashboard (the only required secret)
+      - key: DEEPSEEK_BASE_URL
+        value: https://api.lkeap.cloud.tencent.com/v1
+      - key: DEEPSEEK_MODEL
+        value: deepseek-v3-0324
+      - key: ENABLE_OBSERVABILITY
+        value: "false"
+      # The agentic (OpenAI-Agents-SDK) reviewer runs for EVERY streamed claim — demo
+      # scenarios AND uploads alike — so both drive the identical pipeline, including the
+      # agentic node. It's non-blocking (the decision streams first; the AI card lands a few
+      # seconds later) and advisory (never changes the deterministic decision). Set "false"
+      # to drop it for a snappier demo.
+      - key: ENABLE_AGENTIC_REVIEW
+        value: "true"
+      # Supabase claims ledger — records LIVE submissions + powers the history-aware fraud
+      # velocity rules (same-day / monthly limits → MANUAL_REVIEW). Set BOTH in the Render
+      # dashboard (publishable/anon key, RLS-protected — kept out of this public repo). If
+      # unset, the ledger is simply disabled (claims still process; velocity not enforced).
+      - key: SUPABASE_URL
+        sync: false # ← set in the Render dashboard, e.g. https://<project>.supabase.co
+      - key: SUPABASE_KEY
+        sync: false # ← set in the Render dashboard (the sb_publishable_… key)
+
+  # ── Next.js frontend (BetterAuth, document preview, plain-language trace) ────
+  - type: web
+    name: mulp-claims-frontend
+    runtime: docker
+    plan: free
+    dockerfilePath: ./frontend/Dockerfile
+    dockerContext: ./frontend
+    autoDeploy: true
+    envVars:
+      # Backend URL is injected from the backend service (no scheme → the runtime
+      # proxy in app/api/[...path]/route.ts prefixes https://). No manual paste needed.
+      - key: BACKEND_ORIGIN
+        fromService:
+          type: web
+          name: mulp-claims-backend
+          property: host
+      - key: BETTER_AUTH_SECRET
+        generateValue: true # Render generates a strong secret for session signing

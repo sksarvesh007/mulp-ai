@@ -1,0 +1,13 @@
+.git
+.design-skills
+frontend/node_modules
+frontend/.next
+backend/.venv
+**/__pycache__
+**/*.db
+**/.env
+**/.env.*.local
+htmlcov
+.pytest_cache
+.mypy_cache
+.ruff_cache

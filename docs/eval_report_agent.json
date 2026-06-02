@@ -1,0 +1,776 @@
+[
+  {
+    "case_id": "TC001",
+    "case_name": "Wrong Document Uploaded",
+    "description": "Member submits two prescriptions for a consultation claim that requires a prescription and a hospital bill.",
+    "expected": {
+      "decision": null,
+      "approved_amount": null,
+      "rejection_reasons": null,
+      "system_must": [
+        "Stop before making any claim decision",
+        "Tell the member specifically what document type was uploaded and what is needed instead",
+        "Not return a generic error \u2014 the message must name the uploaded document type and the required document type"
+      ],
+      "notes": null
+    },
+    "engine": {
+      "decision": null,
+      "status": "NEEDS_MEMBER_ACTION",
+      "approved_amount": null,
+      "rejection_reasons": [],
+      "reason": "You uploaded 2\u00d7 prescription. A CONSULTATION claim requires a prescription and a hospital bill. Please upload: a hospital bill.",
+      "eligible_from": null,
+      "confidence": null,
+      "degraded": false,
+      "document_problem": "You uploaded 2\u00d7 prescription. A CONSULTATION claim requires a prescription and a hospital bill. Please upload: a hospital bill.",
+      "line_items": [],
+      "financial_breakdown": null,
+      "fraud_signals": []
+    },
+    "agent": {
+      "summary": "Your claim for consultation requires a hospital bill to proceed. Currently, only the prescription has been provided.",
+      "concerns": [
+        "Without the hospital bill, we cannot process your claim further."
+      ],
+      "recommended_action": "Please upload the hospital bill to complete your claim submission.",
+      "tools_used": [
+        "required_documents"
+      ],
+      "tool_calls": [
+        {
+          "name": "required_documents",
+          "arguments": "{\"category\":\"CONSULTATION\"}",
+          "output": "{\"required\": [\"PRESCRIPTION\", \"HOSPITAL_BILL\"], \"optional\": [\"LAB_REPORT\", \"DIAGNOSTIC_REPORT\"]}"
+        }
+      ]
+    },
+    "live_doc_types": [
+      "PRESCRIPTION",
+      "PRESCRIPTION"
+    ],
+    "error": null,
+    "match": {
+      "decision_ok": true,
+      "amount_ok": true,
+      "reasons_ok": true,
+      "overall_ok": true
+    }
+  },
+  {
+    "case_id": "TC002",
+    "case_name": "Unreadable Document",
+    "description": "Member uploads a valid prescription but a blurry, unreadable photo of their pharmacy bill.",
+    "expected": {
+      "decision": null,
+      "approved_amount": null,
+      "rejection_reasons": null,
+      "system_must": [
+        "Identify that the pharmacy bill cannot be read",
+        "Ask the member to re-upload that specific document",
+        "Not reject the claim outright"
+      ],
+      "notes": null
+    },
+    "engine": {
+      "decision": null,
+      "status": "NEEDS_MEMBER_ACTION",
+      "approved_amount": null,
+      "rejection_reasons": [],
+      "reason": "Your pharmacy bill (pharmacy_bill_2.png) could not be read \u2014 the image is too blurry or unclear to process. Please re-upload a clear photo of that document. Your other documents were accepted.",
+      "eligible_from": null,
+      "confidence": null,
+      "degraded": false,
+      "document_problem": "Your pharmacy bill (pharmacy_bill_2.png) could not be read \u2014 the image is too blurry or unclear to process. Please re-upload a clear photo of that document. Your other documents were accepted.",
+      "line_items": [],
+      "financial_breakdown": null,
+      "fraud_signals": []
+    },
+    "agent": null,
+    "live_doc_types": [
+      "PHARMACY_BILL",
+      "PRESCRIPTION"
+    ],
+    "error": null,
+    "match": {
+      "decision_ok": true,
+      "amount_ok": true,
+      "reasons_ok": true,
+      "overall_ok": true
+    }
+  },
+  {
+    "case_id": "TC003",
+    "case_name": "Documents Belong to Different Patients",
+    "description": "The prescription is for Rajesh Kumar but the hospital bill is for a different patient, Arjun Mehta.",
+    "expected": {
+      "decision": null,
+      "approved_amount": null,
+      "rejection_reasons": null,
+      "system_must": [
+        "Detect that the documents belong to different people",
+        "Surface this to the member with the specific names found on each document",
+        "Not proceed to a claim decision"
+      ],
+      "notes": null
+    },
+    "engine": {
+      "decision": null,
+      "status": "NEEDS_MEMBER_ACTION",
+      "approved_amount": null,
+      "rejection_reasons": [],
+      "reason": "The prescription (prescription_1.png) is for 'Rajesh Kumar' but the hospital bill (hospital_bill_2.png) is for 'Arjun Mehta'. All documents in a single claim must belong to the same patient.",
+      "eligible_from": null,
+      "confidence": null,
+      "degraded": false,
+      "document_problem": "The prescription (prescription_1.png) is for 'Rajesh Kumar' but the hospital bill (hospital_bill_2.png) is for 'Arjun Mehta'. All documents in a single claim must belong to the same patient.",
+      "line_items": [],
+      "financial_breakdown": null,
+      "fraud_signals": []
+    },
+    "agent": {
+      "summary": "We noticed a mismatch in the patient names between your prescription and hospital bill. For us to process your claim, all documents must belong to the same patient.",
+      "concerns": [
+        "The prescription is for 'Rajesh Kumar' but the hospital bill is for 'Arjun Mehta'."
+      ],
+      "recommended_action": "Please resubmit the claim with documents that all correspond to the same patient. If you believe this is an error, double-check the names on your documents and ensure they match.",
+      "tools_used": [],
+      "tool_calls": []
+    },
+    "live_doc_types": [
+      "HOSPITAL_BILL",
+      "PRESCRIPTION"
+    ],
+    "error": null,
+    "match": {
+      "decision_ok": true,
+      "amount_ok": true,
+      "reasons_ok": true,
+      "overall_ok": true
+    }
+  },
+  {
+    "case_id": "TC004",
+    "case_name": "Clean Consultation \u2014 Full Approval",
+    "description": "Complete, valid consultation claim with correct documents, valid member, covered treatment, within all limits.",
+    "expected": {
+      "decision": "APPROVED",
+      "approved_amount": 1350,
+      "rejection_reasons": null,
+      "system_must": [],
+      "notes": "10% co-pay applied on consultation category (\u20b9150 deducted)"
+    },
+    "engine": {
+      "decision": "APPROVED",
+      "status": "DECIDED",
+      "approved_amount": 1350,
+      "rejection_reasons": [],
+      "reason": "Approved \u20b91,350 after 10% co-pay (\u20b9150 deducted).",
+      "eligible_from": null,
+      "confidence": 0.95,
+      "degraded": false,
+      "document_problem": null,
+      "line_items": [
+        {
+          "description": "Consultation Fee",
+          "amount": 1000,
+          "status": "COVERED",
+          "approved": 1000
+        },
+        {
+          "description": "CBC Test",
+          "amount": 300,
+          "status": "COVERED",
+          "approved": 300
+        },
+        {
+          "description": "Dengue NS1 Test",
+          "amount": 200,
+          "status": "COVERED",
+          "approved": 200
+        }
+      ],
+      "financial_breakdown": {
+        "base": 1500,
+        "is_network": false,
+        "network_discount": 0,
+        "after_discount": 1500,
+        "copay": 150,
+        "after_copay": 1350,
+        "clamps": [],
+        "final": 1350
+      },
+      "fraud_signals": []
+    },
+    "agent": {
+      "summary": "Your claim for the consultation and tests has been approved. The total amount claimed was \u20b91,500, and after applying a 10% co-pay, \u20b91,350 has been approved for reimbursement.",
+      "concerns": [],
+      "recommended_action": "No further action is needed. The approved amount will be processed shortly.",
+      "tools_used": [],
+      "tool_calls": []
+    },
+    "live_doc_types": [
+      "PRESCRIPTION",
+      "HOSPITAL_BILL"
+    ],
+    "error": null,
+    "match": {
+      "decision_ok": true,
+      "amount_ok": true,
+      "reasons_ok": true,
+      "overall_ok": true
+    }
+  },
+  {
+    "case_id": "TC005",
+    "case_name": "Waiting Period \u2014 Diabetes",
+    "description": "Member joined 2024-09-01. Claims for diabetes treatment on 2024-10-15, which is within the 90-day waiting period for diabetes.",
+    "expected": {
+      "decision": "REJECTED",
+      "approved_amount": null,
+      "rejection_reasons": [
+        "WAITING_PERIOD"
+      ],
+      "system_must": [
+        "State the date from which the member will be eligible for diabetes-related claims"
+      ],
+      "notes": null
+    },
+    "engine": {
+      "decision": "REJECTED",
+      "status": "DECIDED",
+      "approved_amount": 0,
+      "rejection_reasons": [
+        "WAITING_PERIOD"
+      ],
+      "reason": "Claims for diabetes have a 90-day waiting period from the join date (2024-09-01). The member is eligible for diabetes-related claims from 2024-11-30; treatment on 2024-10-15 falls within the waiting period.",
+      "eligible_from": "2024-11-30",
+      "confidence": 0.95,
+      "degraded": false,
+      "document_problem": null,
+      "line_items": [],
+      "financial_breakdown": null,
+      "fraud_signals": []
+    },
+    "agent": {
+      "summary": "Your claim for the consultation related to Type 2 Diabetes Mellitus has been rejected because it falls within the 90-day waiting period for diabetes-related treatments. Your coverage for such treatments begins on November 30, 2024.",
+      "concerns": [
+        "The waiting period for diabetes-related claims is 90 days from your join date (September 1, 2024)."
+      ],
+      "recommended_action": "Please resubmit your claim for any diabetes-related treatments after November 30, 2024, when the waiting period ends.",
+      "tools_used": [
+        "category_terms",
+        "member_profile"
+      ],
+      "tool_calls": [
+        {
+          "name": "category_terms",
+          "arguments": "{\"category\": \"CONSULTATION\"}",
+          "output": "{\"sub_limit\": 2000, \"copay_percent\": 10, \"network_discount_percent\": 20, \"requires_prescription\": true, \"requires_pre_auth\": false, \"covered\": true}"
+        },
+        {
+          "name": "member_profile",
+          "arguments": "{\"member_id\": \"EMP005\"}",
+          "output": "{\"member\": {\"member_id\": \"EMP005\", \"name\": \"Vikram Joshi\", \"date_of_birth\": \"1979-09-10\", \"gender\": \"M\", \"relationship\": \"SELF\", \"join_date\": \"2024-09-01\", \"dependents\": []}, \"covered_names\": [\"Vikram Joshi\"]}"
+        }
+      ]
+    },
+    "live_doc_types": [
+      "HOSPITAL_BILL",
+      "PRESCRIPTION"
+    ],
+    "error": null,
+    "match": {
+      "decision_ok": true,
+      "amount_ok": true,
+      "reasons_ok": true,
+      "overall_ok": true
+    }
+  },
+  {
+    "case_id": "TC006",
+    "case_name": "Dental Partial Approval \u2014 Cosmetic Exclusion",
+    "description": "Bill includes root canal treatment (covered) and teeth whitening (cosmetic, excluded). System must approve only the covered procedure.",
+    "expected": {
+      "decision": "PARTIAL",
+      "approved_amount": 8000,
+      "rejection_reasons": null,
+      "system_must": [
+        "Itemize which line items were approved and which were rejected",
+        "State the reason for each rejection at the line-item level"
+      ],
+      "notes": null
+    },
+    "engine": {
+      "decision": "PARTIAL",
+      "status": "DECIDED",
+      "approved_amount": 8000,
+      "rejection_reasons": [],
+      "reason": "Partially approved \u20b98,000; excluded line items removed.",
+      "eligible_from": null,
+      "confidence": 0.95,
+      "degraded": false,
+      "document_problem": null,
+      "line_items": [
+        {
+          "description": "Root Canal Treatment",
+          "amount": 8000,
+          "status": "COVERED",
+          "approved": 8000
+        },
+        {
+          "description": "Teeth Whitening",
+          "amount": 4000,
+          "status": "EXCLUDED",
+          "approved": 0
+        }
+      ],
+      "financial_breakdown": {
+        "base": 8000,
+        "is_network": false,
+        "network_discount": 0,
+        "after_discount": 8000,
+        "copay": 0,
+        "after_copay": 8000,
+        "clamps": [],
+        "final": 8000
+      },
+      "fraud_signals": []
+    },
+    "agent": {
+      "summary": "Your claim has been partially approved for \u20b98,000. The root canal treatment was covered, but the teeth whitening service was excluded as it is not part of your policy benefits.",
+      "concerns": [
+        "Teeth whitening is not covered under your current policy."
+      ],
+      "recommended_action": "No further action is needed for the approved amount. If you have questions about the excluded service, you can review your policy details or contact customer support.",
+      "tools_used": [],
+      "tool_calls": []
+    },
+    "live_doc_types": [
+      "HOSPITAL_BILL"
+    ],
+    "error": null,
+    "match": {
+      "decision_ok": true,
+      "amount_ok": true,
+      "reasons_ok": true,
+      "overall_ok": true
+    }
+  },
+  {
+    "case_id": "TC007",
+    "case_name": "MRI Without Pre-Authorization",
+    "description": "MRI scan costing \u20b915,000 submitted without pre-authorization. Policy requires pre-auth for MRI above \u20b910,000.",
+    "expected": {
+      "decision": "REJECTED",
+      "approved_amount": null,
+      "rejection_reasons": [
+        "PRE_AUTH_MISSING"
+      ],
+      "system_must": [
+        "Explain that pre-authorization was required and not obtained",
+        "Tell the member what they should do to resubmit with pre-auth"
+      ],
+      "notes": null
+    },
+    "engine": {
+      "decision": "REJECTED",
+      "status": "DECIDED",
+      "approved_amount": 0,
+      "rejection_reasons": [
+        "PRE_AUTH_MISSING"
+      ],
+      "reason": "Pre-authorization was required for MRI (\u20b915,000 exceeds the \u20b910,000 threshold) but was not obtained. Please obtain pre-authorization from the insurer and resubmit the claim within 30 days of approval.",
+      "eligible_from": null,
+      "confidence": 0.99,
+      "degraded": false,
+      "document_problem": null,
+      "line_items": [],
+      "financial_breakdown": null,
+      "fraud_signals": []
+    },
+    "agent": {
+      "summary": "Your claim for the MRI Lumbar Spine was rejected because pre-authorization was required for the MRI (as it exceeded the \u20b910,000 threshold) but wasn't obtained beforehand. Please get pre-authorization from the insurer and resubmit the claim within 30 days of approval.",
+      "concerns": [
+        "Pre-authorization is required for high-value tests like MRIs exceeding \u20b910,000."
+      ],
+      "recommended_action": "Obtain pre-authorization from the insurer and resubmit the claim within 30 days of approval.",
+      "tools_used": [
+        "category_terms",
+        "fraud_thresholds"
+      ],
+      "tool_calls": [
+        {
+          "name": "category_terms",
+          "arguments": "{\"category\":\"DIAGNOSTIC\"}",
+          "output": "{\"sub_limit\": 10000, \"copay_percent\": 0, \"network_discount_percent\": 10, \"requires_prescription\": true, \"requires_pre_auth\": false, \"pre_auth_threshold\": 10000, \"high_value_tests_requiring_pre_auth\": [\"MRI\", \"CT Scan\", \"PET Scan\"], \"covered\": true}"
+        },
+        {
+          "name": "fraud_thresholds",
+          "arguments": "{}",
+          "output": "{\"same_day_claims_limit\": 2, \"monthly_claims_limit\": 6, \"high_value_claim_threshold\": 25000, \"auto_manual_review_above\": 25000, \"fraud_score_manual_review_threshold\": 0.8}"
+        }
+      ]
+    },
+    "live_doc_types": [
+      "LAB_REPORT",
+      "HOSPITAL_BILL",
+      "PRESCRIPTION"
+    ],
+    "error": null,
+    "match": {
+      "decision_ok": true,
+      "amount_ok": true,
+      "reasons_ok": true,
+      "overall_ok": true
+    }
+  },
+  {
+    "case_id": "TC008",
+    "case_name": "Per-Claim Limit Exceeded",
+    "description": "Claimed amount of \u20b97,500 exceeds the per-claim limit of \u20b95,000.",
+    "expected": {
+      "decision": "REJECTED",
+      "approved_amount": null,
+      "rejection_reasons": [
+        "PER_CLAIM_EXCEEDED"
+      ],
+      "system_must": [
+        "State the per-claim limit and the claimed amount clearly in the rejection message"
+      ],
+      "notes": null
+    },
+    "engine": {
+      "decision": "REJECTED",
+      "status": "DECIDED",
+      "approved_amount": 0,
+      "rejection_reasons": [
+        "PER_CLAIM_EXCEEDED"
+      ],
+      "reason": "The claimed amount \u20b97,500 exceeds the per-claim limit of \u20b95,000. The entire claim is rejected.",
+      "eligible_from": null,
+      "confidence": 0.95,
+      "degraded": false,
+      "document_problem": null,
+      "line_items": [],
+      "financial_breakdown": null,
+      "fraud_signals": []
+    },
+    "agent": {
+      "summary": "Your claim for the consultation has been rejected because the claimed amount of \u20b97,500 exceeds the per-claim limit of \u20b95,000 for this category.",
+      "concerns": [
+        "The maximum amount you can claim for a consultation is \u20b95,000."
+      ],
+      "recommended_action": "Please adjust your claim amount to stay within the \u20b95,000 limit and resubmit your claim.",
+      "tools_used": [
+        "category_terms"
+      ],
+      "tool_calls": [
+        {
+          "name": "category_terms",
+          "arguments": "{\"category\":\"CONSULTATION\"}",
+          "output": "{\"sub_limit\": 2000, \"copay_percent\": 10, \"network_discount_percent\": 20, \"requires_prescription\": true, \"requires_pre_auth\": false, \"covered\": true}"
+        }
+      ]
+    },
+    "live_doc_types": [
+      "HOSPITAL_BILL",
+      "PRESCRIPTION"
+    ],
+    "error": null,
+    "match": {
+      "decision_ok": true,
+      "amount_ok": true,
+      "reasons_ok": true,
+      "overall_ok": true
+    }
+  },
+  {
+    "case_id": "TC009",
+    "case_name": "Fraud Signal \u2014 Multiple Same-Day Claims",
+    "description": "Member EMP008 has already submitted 3 claims today before this one arrives. This is the 4th claim from the same member on the same day.",
+    "expected": {
+      "decision": "MANUAL_REVIEW",
+      "approved_amount": null,
+      "rejection_reasons": null,
+      "system_must": [
+        "Flag the unusual same-day claim pattern",
+        "Route to manual review rather than auto-rejecting",
+        "Include the specific signals that triggered the flag in the output"
+      ],
+      "notes": null
+    },
+    "engine": {
+      "decision": "MANUAL_REVIEW",
+      "status": "DECIDED",
+      "approved_amount": null,
+      "rejection_reasons": [],
+      "reason": "Routed to manual review due to anomaly signals: 4 claims on 2024-10-30 exceeds the same-day limit of 2.",
+      "eligible_from": null,
+      "confidence": 0.85,
+      "degraded": false,
+      "document_problem": null,
+      "line_items": [],
+      "financial_breakdown": null,
+      "fraud_signals": [
+        "SAME_DAY_CLAIMS"
+      ]
+    },
+    "agent": {
+      "summary": "Your claim has been flagged for manual review because our system detected an unusually high number of claims submitted on the same day (30th October 2024). This doesn't necessarily mean there's an issue with your claim, but we need a human to double-check it.",
+      "concerns": [
+        "The system detected 4 claims submitted on 2024-10-30, which exceeds the usual limit of 2 claims per day."
+      ],
+      "recommended_action": "No action is needed from you at this time. Our team will review your claim and notify you once the process is complete. Thank you for your patience!",
+      "tools_used": [],
+      "tool_calls": []
+    },
+    "live_doc_types": [
+      "PRESCRIPTION",
+      "HOSPITAL_BILL"
+    ],
+    "error": null,
+    "match": {
+      "decision_ok": true,
+      "amount_ok": true,
+      "reasons_ok": true,
+      "overall_ok": true
+    }
+  },
+  {
+    "case_id": "TC010",
+    "case_name": "Network Hospital \u2014 Discount Applied",
+    "description": "Valid claim at Apollo Hospitals, a network hospital. Network discount must be applied before co-pay.",
+    "expected": {
+      "decision": "APPROVED",
+      "approved_amount": 3240,
+      "rejection_reasons": null,
+      "system_must": [
+        "Apply network discount before co-pay, not after",
+        "Show the breakdown of discount and co-pay in the decision output"
+      ],
+      "notes": "Network discount (20%) applied first on \u20b94,500 = \u20b93,600. Co-pay (10%) applied on \u20b93,600 = \u20b9360 deducted. Final: \u20b93,240."
+    },
+    "engine": {
+      "decision": "APPROVED",
+      "status": "DECIDED",
+      "approved_amount": 3240,
+      "rejection_reasons": [],
+      "reason": "Approved \u20b93,240 (20% network discount then 10% co-pay).",
+      "eligible_from": null,
+      "confidence": 0.95,
+      "degraded": false,
+      "document_problem": null,
+      "line_items": [
+        {
+          "description": "Consultation Fee",
+          "amount": 1500,
+          "status": "COVERED",
+          "approved": 1500
+        },
+        {
+          "description": "Medicines",
+          "amount": 3000,
+          "status": "COVERED",
+          "approved": 3000
+        }
+      ],
+      "financial_breakdown": {
+        "base": 4500,
+        "is_network": true,
+        "network_discount": 900,
+        "after_discount": 3600,
+        "copay": 360,
+        "after_copay": 3240,
+        "clamps": [],
+        "final": 3240
+      },
+      "fraud_signals": []
+    },
+    "agent": {
+      "summary": "Your claim for the consultation at Apollo Hospitals has been approved for \u20b93,240. This includes a 20% network discount and a 10% co-pay, as per your policy terms.",
+      "concerns": [
+        "The consultation fee exceeded the sub-limit of \u20b92,000, so the approved amount was adjusted accordingly.",
+        "Ensure you provide a prescription and hospital bill for future claims to avoid delays."
+      ],
+      "recommended_action": "No further action is needed. The approved amount will be processed shortly.",
+      "tools_used": [
+        "category_terms",
+        "member_profile",
+        "required_documents"
+      ],
+      "tool_calls": [
+        {
+          "name": "member_profile",
+          "arguments": "{\"member_id\": \"EMP010\"}",
+          "output": "{\"member\": {\"member_id\": \"EMP010\", \"name\": \"Deepak Shah\", \"date_of_birth\": \"1980-01-07\", \"gender\": \"M\", \"relationship\": \"SELF\", \"join_date\": \"2024-04-01\", \"dependents\": [\"DEP006\"]}, \"covered_names\": [\"Deepak Shah\"]}"
+        },
+        {
+          "name": "category_terms",
+          "arguments": "{\"category\": \"CONSULTATION\"}",
+          "output": "{\"sub_limit\": 2000, \"copay_percent\": 10, \"network_discount_percent\": 20, \"requires_prescription\": true, \"requires_pre_auth\": false, \"covered\": true}"
+        },
+        {
+          "name": "required_documents",
+          "arguments": "{\"category\": \"CONSULTATION\"}",
+          "output": "{\"required\": [\"PRESCRIPTION\", \"HOSPITAL_BILL\"], \"optional\": [\"LAB_REPORT\", \"DIAGNOSTIC_REPORT\"]}"
+        }
+      ]
+    },
+    "live_doc_types": [
+      "HOSPITAL_BILL",
+      "PRESCRIPTION"
+    ],
+    "error": null,
+    "match": {
+      "decision_ok": true,
+      "amount_ok": true,
+      "reasons_ok": true,
+      "overall_ok": true
+    }
+  },
+  {
+    "case_id": "TC011",
+    "case_name": "Component Failure \u2014 Graceful Degradation",
+    "description": "One component of your system fails mid-processing (simulate with the flag below). The overall pipeline must continue, produce a decision, and make the failure visible in the output with an appropriately reduced confidence score.",
+    "expected": {
+      "decision": "APPROVED",
+      "approved_amount": null,
+      "rejection_reasons": null,
+      "system_must": [
+        "Not crash or return a 500 error",
+        "Indicate in the output that a component failed and was skipped",
+        "Return a confidence score lower than a normal full-pipeline approval",
+        "Include a note that manual review is recommended due to incomplete processing"
+      ],
+      "notes": null
+    },
+    "engine": {
+      "decision": "APPROVED",
+      "status": "DECIDED",
+      "approved_amount": 4000,
+      "rejection_reasons": [],
+      "reason": "Approved \u20b94,000.",
+      "eligible_from": null,
+      "confidence": 0.8,
+      "degraded": true,
+      "document_problem": null,
+      "line_items": [
+        {
+          "description": "Panchakarma Therapy (5 sessions)",
+          "amount": 3000,
+          "status": "COVERED",
+          "approved": 3000
+        },
+        {
+          "description": "Consultation",
+          "amount": 1000,
+          "status": "COVERED",
+          "approved": 1000
+        }
+      ],
+      "financial_breakdown": {
+        "base": 4000,
+        "is_network": false,
+        "network_discount": 0,
+        "after_discount": 4000,
+        "copay": 0,
+        "after_copay": 4000,
+        "clamps": [],
+        "final": 4000
+      },
+      "fraud_signals": []
+    },
+    "agent": {
+      "summary": "Your claim for Panchakarma Therapy (5 sessions) and consultation has been approved for the full amount of \u20b94,000. Alternative medicine treatments like Ayurveda are covered under your policy, and we're glad to support your health journey.",
+      "concerns": [
+        "Make sure to keep your prescription and hospital bills handy for future claims, as these are required documents for alternative medicine treatments.",
+        "Your policy allows up to 20 sessions per year for alternative medicine, so you have plenty of coverage left for future needs."
+      ],
+      "recommended_action": "No action is needed from your side\u2014the approved amount will be processed shortly.",
+      "tools_used": [
+        "category_terms",
+        "member_profile",
+        "required_documents"
+      ],
+      "tool_calls": [
+        {
+          "name": "required_documents",
+          "arguments": "{\"category\": \"ALTERNATIVE_MEDICINE\"}",
+          "output": "{\"required\": [\"PRESCRIPTION\", \"HOSPITAL_BILL\"], \"optional\": []}"
+        },
+        {
+          "name": "member_profile",
+          "arguments": "{\"member_id\": \"EMP006\"}",
+          "output": "{\"member\": {\"member_id\": \"EMP006\", \"name\": \"Kavita Nair\", \"date_of_birth\": \"1983-06-18\", \"gender\": \"F\", \"relationship\": \"SELF\", \"join_date\": \"2024-04-01\", \"dependents\": []}, \"covered_names\": [\"Kavita Nair\"]}"
+        },
+        {
+          "name": "category_terms",
+          "arguments": "{\"category\": \"ALTERNATIVE_MEDICINE\"}",
+          "output": "{\"sub_limit\": 8000, \"copay_percent\": 0, \"requires_prescription\": true, \"requires_registered_practitioner\": true, \"max_sessions_per_year\": 20, \"covered_systems\": [\"Ayurveda\", \"Homeopathy\", \"Unani\", \"Siddha\", \"Naturopathy\"], \"covered\": true}"
+        }
+      ]
+    },
+    "live_doc_types": [
+      "PRESCRIPTION",
+      "HOSPITAL_BILL"
+    ],
+    "error": null,
+    "match": {
+      "decision_ok": true,
+      "amount_ok": true,
+      "reasons_ok": true,
+      "overall_ok": true
+    }
+  },
+  {
+    "case_id": "TC012",
+    "case_name": "Excluded Treatment",
+    "description": "Member claims for bariatric consultation and a diet program. Obesity treatment is explicitly excluded under the policy.",
+    "expected": {
+      "decision": "REJECTED",
+      "approved_amount": null,
+      "rejection_reasons": [
+        "EXCLUDED_CONDITION"
+      ],
+      "system_must": [],
+      "notes": null
+    },
+    "engine": {
+      "decision": "REJECTED",
+      "status": "DECIDED",
+      "approved_amount": 0,
+      "rejection_reasons": [
+        "EXCLUDED_CONDITION"
+      ],
+      "reason": "This claim is for 'Obesity and weight loss programs', which is explicitly excluded under the policy and is not payable.",
+      "eligible_from": null,
+      "confidence": 0.99,
+      "degraded": false,
+      "document_problem": null,
+      "line_items": [],
+      "financial_breakdown": null,
+      "fraud_signals": []
+    },
+    "agent": {
+      "summary": "Your claim for 'Bariatric Consultation and Customised Diet Plan' has been rejected because obesity and weight loss programs are not covered under your policy. This means the entire claimed amount of \u20b98,000 cannot be reimbursed.",
+      "concerns": [
+        "The treatment is excluded under your policy terms."
+      ],
+      "recommended_action": "Since this treatment is not covered, you may want to explore other payment options or check if your employer offers additional wellness benefits.",
+      "tools_used": [],
+      "tool_calls": []
+    },
+    "live_doc_types": [
+      "PRESCRIPTION",
+      "HOSPITAL_BILL"
+    ],
+    "error": null,
+    "match": {
+      "decision_ok": true,
+      "amount_ok": true,
+      "reasons_ok": true,
+      "overall_ok": true
+    }
+  }
+]

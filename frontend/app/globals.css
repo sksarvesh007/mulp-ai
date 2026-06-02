@@ -1,0 +1,138 @@
+@import "tailwindcss";
+
+/* ============================================================
+   Mulp design system - dark-luxury burgundy + brand coral.
+   Palette mirrors mulphq.com (live-verified hex).
+   ============================================================ */
+@theme {
+  /* surfaces */
+  --color-bg: #1d0716;
+  --color-surface: #2b0b21;
+  --color-surface-2: #3a0e2b;
+  --color-border: oklch(1 0 0 / 10%);
+  --color-border-strong: oklch(1 0 0 / 18%);
+
+  /* ink */
+  --color-ink: #fff1e5;
+  --color-ink-muted: #c7a6ba;
+  --color-ink-faint: #8d6a7e;
+
+  /* brand + accents */
+  --color-brand: #ff4052;
+  --color-brand-hover: #ff5a6a;
+  --color-cream: #fffaf2;
+  --color-amber: #ffba21;
+  --color-sky: #6db0e0;
+  --color-leaf: #92bd33;
+
+  /* decision semantics */
+  --color-approved: #92bd33;
+  --color-partial: #ffba21;
+  --color-rejected: #ff4052;
+  --color-review: #6db0e0;
+
+  /* typography */
+  --font-display: var(--font-fraunces), Georgia, serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+
+  /* radii */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+
+  /* motion - emilkowalski curves */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+  html {
+    background: var(--color-bg);
+    color-scheme: dark;
+  }
+  body {
+    background:
+      radial-gradient(1200px 600px at 80% -10%, rgba(255, 64, 82, 0.1), transparent 60%),
+      radial-gradient(900px 500px at 0% 0%, rgba(109, 176, 224, 0.06), transparent 55%),
+      var(--color-bg);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    min-height: 100dvh;
+  }
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    letter-spacing: -0.03em;
+    font-weight: 400;
+  }
+  ::selection {
+    background: var(--color-brand);
+    color: var(--color-cream);
+  }
+}
+
+/* ── motion primitives ─────────────────────────────────────── */
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 64, 82, 0.45);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgba(255, 64, 82, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 64, 82, 0);
+  }
+}
+.animate-fade-up {
+  animation: fade-up 0.4s var(--ease-out) both;
+}
+.animate-fade-in {
+  animation: fade-in 0.3s var(--ease-out) both;
+}
+.pulse-ring {
+  animation: pulse-ring 1.6s var(--ease-out) infinite;
+}
+
+/* press feedback - emilkowalski: every pressable scales slightly */
+.pressable {
+  transition:
+    transform 0.16s var(--ease-out),
+    background-color 0.16s var(--ease-out),
+    border-color 0.16s var(--ease-out),
+    opacity 0.16s var(--ease-out);
+}
+.pressable:active {
+  transform: scale(0.97);
+}
+
+.scroll-thin::-webkit-scrollbar {
+  width: 8px;
+}
+.scroll-thin::-webkit-scrollbar-thumb {
+  background: var(--color-border-strong);
+  border-radius: 9999px;
+}

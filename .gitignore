@@ -1,0 +1,62 @@
+# Secrets — never commit
+.env
+*.env
+!*.env.example
+backend/.env
+frontend/.env*.local
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+.coverage
+htmlcov/
+
+# uv
+# (uv.lock IS committed for reproducible builds)
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+dist/
+*.tsbuildinfo
+.vercel
+
+# Observability / local data
+mlruns/
+*.sqlite
+*.sqlite3
+*.db
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# Working drafts from the planning workflow (reference only)
+.plan_workshop/
+
+# Local uploads + generated eval document images
+backend/data/uploads/
+backend/data/eval_docs/
+
+# Internal planning / extra eval reports — keep the repo's docs minimal (deliverables only)
+docs/PLAN.md
+docs/DEMO_SCRIPT.md
+docs/EVAL_REPORT_LIVE.md
+docs/EVAL_REPORT_JUDGE.md
+
+# Vendored design skills: keep the skill content, drop the heavy built site
+.design-skills/impeccable/site/
+
+# Frontend boilerplate / agent-tooling files (not deliverables)
+frontend/README.md
+frontend/AGENTS.md
+frontend/CLAUDE.md
+docs/README.md

@@ -1,0 +1,161 @@
+[
+  {
+    "id": "approved_consultation",
+    "bucket": "approved",
+    "label": "Clean consultation",
+    "description": "A straightforward GP visit + basic tests \u2014 fully covered after the 10% co-pay.",
+    "form": {
+      "member_id": "EMP002",
+      "claim_category": "CONSULTATION",
+      "treatment_date": "2024-11-01",
+      "claimed_amount": 1500,
+      "hospital_name": ""
+    },
+    "files": [
+      "/samples/approved_consultation/prescription.png",
+      "/samples/approved_consultation/hospital_bill.png"
+    ]
+  },
+  {
+    "id": "approved_network",
+    "bucket": "approved",
+    "label": "Network hospital discount",
+    "description": "Treated at a network hospital (Apollo) \u2014 a 20% network discount applies before co-pay.",
+    "form": {
+      "member_id": "EMP003",
+      "claim_category": "CONSULTATION",
+      "treatment_date": "2024-11-03",
+      "claimed_amount": 4500,
+      "hospital_name": "Apollo Hospitals"
+    },
+    "files": [
+      "/samples/approved_network/prescription.png",
+      "/samples/approved_network/hospital_bill.png"
+    ]
+  },
+  {
+    "id": "approved_dental_partial",
+    "bucket": "approved",
+    "label": "Dental \u2014 partial (cosmetic excluded)",
+    "description": "Root canal is covered; teeth whitening is cosmetic and excluded \u2014 so it partially approves.",
+    "form": {
+      "member_id": "EMP004",
+      "claim_category": "DENTAL",
+      "treatment_date": "2024-10-15",
+      "claimed_amount": 12000,
+      "hospital_name": ""
+    },
+    "files": [
+      "/samples/approved_dental_partial/hospital_bill.png"
+    ]
+  },
+  {
+    "id": "rejected_waiting_diabetes",
+    "bucket": "rejected",
+    "label": "Diabetes within waiting period",
+    "description": "A new joiner's diabetes claim falls inside the 90-day condition waiting period.",
+    "form": {
+      "member_id": "EMP005",
+      "claim_category": "CONSULTATION",
+      "treatment_date": "2024-10-15",
+      "claimed_amount": 3000,
+      "hospital_name": ""
+    },
+    "files": [
+      "/samples/rejected_waiting_diabetes/prescription.png",
+      "/samples/rejected_waiting_diabetes/hospital_bill.png"
+    ]
+  },
+  {
+    "id": "rejected_excluded_bariatric",
+    "bucket": "rejected",
+    "label": "Excluded treatment (bariatric)",
+    "description": "Obesity / weight-loss treatment is explicitly excluded under the policy.",
+    "form": {
+      "member_id": "EMP001",
+      "claim_category": "CONSULTATION",
+      "treatment_date": "2024-10-18",
+      "claimed_amount": 8000,
+      "hospital_name": ""
+    },
+    "files": [
+      "/samples/rejected_excluded_bariatric/prescription.png",
+      "/samples/rejected_excluded_bariatric/hospital_bill.png"
+    ]
+  },
+  {
+    "id": "rejected_per_claim_limit",
+    "bucket": "rejected",
+    "label": "Over the per-claim limit",
+    "description": "\u20b97,500 on one consultation exceeds the \u20b95,000 per-claim limit \u2014 the whole claim is rejected.",
+    "form": {
+      "member_id": "EMP006",
+      "claim_category": "CONSULTATION",
+      "treatment_date": "2024-10-20",
+      "claimed_amount": 7500,
+      "hospital_name": ""
+    },
+    "files": [
+      "/samples/rejected_per_claim_limit/prescription.png",
+      "/samples/rejected_per_claim_limit/hospital_bill.png"
+    ]
+  },
+  {
+    "id": "rejected_mri_no_preauth",
+    "bucket": "rejected",
+    "label": "MRI without pre-authorization",
+    "description": "A \u20b915,000 MRI needs pre-authorization (>\u20b910k) \u2014 none was obtained, so it's rejected.",
+    "form": {
+      "member_id": "EMP007",
+      "claim_category": "DIAGNOSTIC",
+      "treatment_date": "2024-11-02",
+      "claimed_amount": 15000,
+      "hospital_name": ""
+    },
+    "files": [
+      "/samples/rejected_mri_no_preauth/prescription.png",
+      "/samples/rejected_mri_no_preauth/lab_report.png",
+      "/samples/rejected_mri_no_preauth/hospital_bill.png"
+    ]
+  },
+  {
+    "id": "review_high_value",
+    "bucket": "hitl",
+    "label": "High-value claim",
+    "description": "A \u20b928,000 claim exceeds the \u20b925,000 auto-review threshold \u2014 routed to a human reviewer.",
+    "form": {
+      "member_id": "EMP009",
+      "claim_category": "DIAGNOSTIC",
+      "treatment_date": "2024-10-28",
+      "claimed_amount": 28000,
+      "hospital_name": ""
+    },
+    "files": [
+      "/samples/review_high_value/prescription.png",
+      "/samples/review_high_value/lab_report.png",
+      "/samples/review_high_value/hospital_bill.png"
+    ]
+  },
+  {
+    "id": "review_same_day",
+    "bucket": "hitl",
+    "label": "Multiple same-day claims",
+    "description": "Selecting this seeds 2 earlier same-day claims for this member; running it is the 3rd that day, which trips the same-day velocity rule \u2192 human review. (Needs the ledger on.)",
+    "form": {
+      "member_id": "EMP010",
+      "claim_category": "CONSULTATION",
+      "treatment_date": "2024-11-05",
+      "claimed_amount": 1500,
+      "hospital_name": ""
+    },
+    "files": [
+      "/samples/review_same_day/prescription.png",
+      "/samples/review_same_day/hospital_bill.png"
+    ],
+    "seed": {
+      "member_id": "EMP010",
+      "treatment_date": "2024-11-05",
+      "count": 2
+    }
+  }
+]
